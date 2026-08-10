@@ -1,0 +1,2708 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clean My Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --wall:#efe7d8;
+    --wall-deep:#e2d5bd;
+    --wall-line: rgba(43,35,28,0.06);
+    --wood-dark:#4a2a1e;
+    --wood:#6f3d29;
+    --wood-mid:#8c5236;
+    --wood-light:#b06f47;
+    --wood-highlight:#d99a68;
+    --brass:#cf9f42;
+    --brass-light:#f0cd82;
+    --ink:#2b231c;
+    --ink-soft:#5a4f43;
+    --paper:#fffbf3;
+    --coral:#df6b4e;
+    --coral-deep:#c14f36;
+    --gold:#e0a53d;
+    --floor-dark:#3a2417;
+    --floor:#5c3a26;
+    --shadow: 0 18px 40px rgba(43,25,14,0.28);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    color:var(--ink);
+    background:var(--wall);
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  ::selection{ background:var(--coral); color:var(--paper); }
+
+  :focus-visible{
+    outline: 3px solid var(--coral-deep);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* ---------- SCENE / WALL ---------- */
+  .scene{
+    position:relative;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, rgba(255,255,255,0.5), transparent 60%),
+      repeating-linear-gradient(90deg, var(--wall-line) 0 1px, transparent 1px 96px),
+      linear-gradient(180deg, var(--wall) 0%, var(--wall-deep) 100%);
+  }
+
+  .hero{
+    flex:1;
+    display:grid;
+    grid-template-columns: 1.1fr 1fr 1.1fr;
+    align-items:center;
+    gap: clamp(16px, 4vw, 48px);
+    padding: clamp(28px, 6vh, 72px) clamp(24px, 6vw, 96px) 40px;
+    max-width:1440px;
+    margin:0 auto;
+    width:100%;
+  }
+
+  /* ---------- LEFT: TITLE ---------- */
+  .left-col{ display:flex; flex-direction:column; gap:28px; }
+
+  .eyebrow{
+    font-family:"Noto Sans TC",sans-serif;
+    font-weight:700;
+    font-size:12px;
+    letter-spacing:.32em;
+    color:var(--coral-deep);
+    text-transform:uppercase;
+  }
+
+  .title{
+    font-family:"Fraunces", serif;
+    font-weight:900;
+    font-style:italic;
+    font-size: clamp(52px, 8vw, 104px);
+    line-height:0.92;
+    margin:0;
+    color:var(--ink);
+    letter-spacing:-0.01em;
+  }
+  .title span{ display:block; }
+  .title .accent{ color:var(--coral-deep); font-style:normal; }
+
+  .quote{
+    max-width:360px;
+    margin:0;
+    padding-left:18px;
+    border-left:3px solid var(--wood-light);
+    font-size:15px;
+    line-height:1.9;
+    color:var(--ink-soft);
+  }
+  .quote cite{
+    display:block;
+    margin-top:8px;
+    font-style:normal;
+    font-size:13px;
+    color:var(--ink-soft);
+    opacity:.75;
+  }
+
+  /* ---------- CENTER: DOOR ---------- */
+  .center-col{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+  }
+
+  .board-btn{
+    font-family:"Noto Sans TC",sans-serif;
+    font-weight:700;
+    font-size:14px;
+    letter-spacing:.06em;
+    color:var(--paper);
+    background: linear-gradient(180deg, var(--coral) 0%, var(--coral-deep) 100%);
+    border:none;
+    border-radius:999px;
+    padding:10px 26px;
+    cursor:pointer;
+    box-shadow: 0 8px 18px rgba(193,79,54,0.35);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .board-btn:hover{ transform: translateY(-2px); box-shadow: 0 12px 22px rgba(193,79,54,0.42); }
+  .board-btn:active{ transform: translateY(0px) scale(.98); }
+
+  .door-wrap{
+    position:relative;
+    cursor:pointer;
+    border:none;
+    background:none;
+    padding: 0;
+    perspective: 1400px;
+  }
+
+  .door-glow{
+    position:absolute;
+    inset: -40px -60px;
+    background: radial-gradient(ellipse at 50% 35%, rgba(240,205,130,0.55), transparent 68%);
+    filter: blur(6px);
+    opacity:.85;
+    z-index:0;
+    pointer-events:none;
+    transition: opacity .4s ease, transform .4s ease;
+  }
+  .door-wrap:hover .door-glow{ opacity:1; transform:scale(1.08); }
+
+  .door-frame{
+    position:relative;
+    z-index:1;
+    width: clamp(150px, 15vw, 200px);
+    height: clamp(320px, 42vw, 430px);
+    background: linear-gradient(160deg, var(--wood-dark), #1c110b 120%);
+    border-radius: 10px 10px 4px 4px;
+    padding: 10px;
+    box-shadow: var(--shadow);
+    transform-style: preserve-3d;
+  }
+
+  .door{
+    position:relative;
+    width:100%;
+    height:100%;
+    background: linear-gradient(120deg, var(--wood-light) 0%, var(--wood-mid) 45%, var(--wood) 100%);
+    border-radius: 6px 6px 2px 2px;
+    box-shadow: inset 0 0 0 3px rgba(0,0,0,0.15), inset 0 4px 10px rgba(255,255,255,0.15);
+    transform-origin: left center;
+    transition: transform .85s cubic-bezier(.68,-0.2,.27,1.15);
+    overflow:hidden;
+  }
+  .door::before{
+    content:"";
+    position:absolute; inset:0;
+    background: repeating-linear-gradient(100deg, rgba(0,0,0,0.05) 0 2px, transparent 2px 9px);
+    mix-blend-mode: multiply;
+  }
+
+  .door-panel{
+    position:absolute;
+    left:14%; right:14%;
+    border-radius: 50% 50% 8px 8px / 22% 22% 6px 6px;
+    box-shadow:
+      inset 0 0 0 2px rgba(0,0,0,0.18),
+      inset 0 3px 6px rgba(255,255,255,0.18),
+      inset 0 -4px 10px rgba(0,0,0,0.18);
+    background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(0,0,0,0.08));
+  }
+  .door-panel.top{ top:8%; height:38%; }
+  .door-panel.bottom{ top:52%; height:40%; border-radius: 8px / 6%; }
+
+  .door-handle{
+    position:absolute;
+    right:10%;
+    top:52%;
+    width:26px; height:9px;
+    background: linear-gradient(180deg, var(--brass-light), var(--brass));
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+  .door-handle::before{
+    content:"";
+    position:absolute;
+    right:-2px; top:-9px;
+    width:11px; height:11px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, var(--brass-light), var(--brass) 70%);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.4);
+  }
+
+  .door-keyhole{
+    position:absolute;
+    right:calc(10% + 3px);
+    top:60%;
+    width:7px; height:7px;
+    border-radius:50%;
+    background: #1a0f09;
+    box-shadow: 0 6px 3px -3px #1a0f09, 0 0 10px 2px rgba(255,214,120,0.9);
+    animation: keyhole-flicker 2.6s ease-in-out infinite;
+  }
+  @keyframes keyhole-flicker{
+    0%,100%{ box-shadow: 0 6px 3px -3px #1a0f09, 0 0 8px 1px rgba(255,214,120,0.75); }
+    50%{ box-shadow: 0 6px 3px -3px #1a0f09, 0 0 14px 3px rgba(255,214,120,1); }
+  }
+
+  .door-wrap:hover .door{ transform: rotateY(-4deg) translateX(1px); }
+
+  .door-frame::after{
+    content:"";
+    position:absolute;
+    inset:10px;
+    border-radius:6px;
+    background: radial-gradient(ellipse at 30% 50%, #150c07 0%, #000 90%);
+    z-index:-1;
+  }
+
+  .door.is-open{
+    transform: rotateY(-104deg);
+  }
+
+  .hint{
+    font-size:12px;
+    color: var(--ink-soft);
+    opacity:.7;
+    letter-spacing:.04em;
+  }
+
+  /* ---------- RIGHT: AVATAR + BUBBLE ---------- */
+  .right-col{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    justify-self:end;
+  }
+
+  .speech-bubble{
+    position:relative;
+    max-width:230px;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 22px;
+    padding: 16px 20px;
+    font-size:14px;
+    font-weight:700;
+    line-height:1.6;
+    text-align:center;
+    box-shadow: 4px 6px 0 rgba(43,35,28,0.12);
+  }
+  .speech-bubble::after{
+    content:"";
+    position:absolute;
+    left: 62%;
+    bottom:-16px;
+    width:0; height:0;
+    border: 10px solid transparent;
+    border-top-color: var(--ink);
+    filter: drop-shadow(0 0 0 var(--ink));
+  }
+  .speech-bubble::before{
+    content:"";
+    position:absolute;
+    left: calc(62% + 2px);
+    bottom:-12px;
+    width:0; height:0;
+    border: 8px solid transparent;
+    border-top-color: var(--paper);
+    z-index:1;
+  }
+
+  .avatar{
+    width: clamp(140px, 14vw, 190px);
+    filter: drop-shadow(0 12px 16px rgba(43,25,14,0.18));
+  }
+
+  /* ---------- FLOOR + GUINEA PIG ---------- */
+  .floor{
+    position:relative;
+    height: 92px;
+    background: linear-gradient(180deg, var(--floor) 0%, var(--floor-dark) 100%);
+    box-shadow: 0 -4px 0 rgba(0,0,0,0.15) inset, 0 8px 18px rgba(0,0,0,0.25);
+    overflow:visible;
+  }
+  .floor::before{
+    content:"";
+    position:absolute; top:0; left:0; right:0; height:6px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.18), transparent);
+  }
+
+  .guinea-wrap{
+    position:absolute;
+    bottom: 14px;
+    left: 20%;
+    width:84px;
+    cursor:pointer;
+    transition: left 2.4s linear;
+    z-index:5;
+  }
+  .guinea-wrap.face-left{ transform: scaleX(-1); }
+
+  .guinea-pig{
+    display:block;
+    width:100%;
+    animation: guinea-bob 0.42s ease-in-out infinite;
+    transform-origin: 50% 100%;
+  }
+  .guinea-wrap.idle .guinea-pig{ animation: none; }
+  @keyframes guinea-bob{
+    0%,100%{ transform: translateY(0) rotate(0deg); }
+    50%{ transform: translateY(-3px) rotate(-1.5deg); }
+  }
+
+  .guinea-bubble{
+    position:absolute;
+    left:50%;
+    bottom: 100%;
+    transform: translate(-50%, 10px) scale(.7);
+    margin-bottom:10px;
+    background: var(--gold);
+    color: var(--ink);
+    font-weight:900;
+    font-size:14px;
+    padding:6px 12px;
+    border-radius: 14px;
+    border: 2px solid var(--ink);
+    white-space:nowrap;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity .18s ease, transform .18s ease;
+  }
+  .guinea-wrap.face-left .guinea-bubble{ transform: translate(-50%, 10px) scale(.7) scaleX(-1); }
+  .guinea-wrap:hover .guinea-bubble{ opacity:1; transform: translate(-50%, 0) scale(1); }
+  .guinea-wrap.face-left:hover .guinea-bubble{ opacity:1; transform: translate(-50%, 0) scale(1) scaleX(-1); }
+
+  /* ---------- TOAST ---------- */
+  .toast{
+    position:fixed;
+    left:50%;
+    bottom:34px;
+    transform: translate(-50%, 20px);
+    background: var(--ink);
+    color: var(--paper);
+    font-size:14px;
+    font-weight:600;
+    padding:12px 22px;
+    border-radius:999px;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity .25s ease, transform .25s ease;
+    z-index:500;
+  }
+  .toast.show{ opacity:1; transform: translate(-50%, 0); }
+
+  /* ---------- MODAL ---------- */
+  .modal-overlay{
+    position:fixed; inset:0;
+    background: rgba(26,17,10,0.55);
+    backdrop-filter: blur(3px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    opacity:0;
+    visibility:hidden;
+    transition: opacity .25s ease;
+    z-index:300;
+  }
+  .modal-overlay.active{ opacity:1; visibility:visible; }
+
+  .modal-card{
+    width:min(360px, 90vw);
+    background: var(--paper);
+    border-radius: 18px;
+    padding: 32px 28px 26px;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.35);
+    transform: translateY(16px) scale(.96);
+    transition: transform .3s cubic-bezier(.2,.9,.3,1.3);
+    text-align:center;
+  }
+  .modal-overlay.active .modal-card{ transform: translateY(0) scale(1); }
+
+  .modal-card h2{
+    font-family:"Fraunces", serif;
+    font-weight:700;
+    font-size:22px;
+    margin: 0 0 6px;
+  }
+  .modal-card p{
+    margin:0 0 20px;
+    font-size:13px;
+    color: var(--ink-soft);
+  }
+
+  .modal-card input{
+    width:100%;
+    font-family:"Noto Sans TC",sans-serif;
+    font-size:15px;
+    padding:12px 14px;
+    border-radius:10px;
+    border: 2px solid #e1d5be;
+    background: #fffdf9;
+    outline:none;
+    transition: border-color .2s ease;
+  }
+  .modal-card input:focus{ border-color: var(--coral-deep); }
+  .modal-card input.shake{ animation: shake .35s ease; border-color: var(--coral-deep); }
+  @keyframes shake{
+    0%,100%{ transform: translateX(0); }
+    25%{ transform: translateX(-6px); }
+    75%{ transform: translateX(6px); }
+  }
+
+  .modal-actions{
+    display:flex;
+    gap:10px;
+    margin-top:20px;
+  }
+  .modal-actions button{
+    flex:1;
+    font-family:"Noto Sans TC",sans-serif;
+    font-weight:700;
+    font-size:14px;
+    padding:11px 0;
+    border-radius:10px;
+    border:none;
+    cursor:pointer;
+    transition: transform .15s ease, filter .15s ease;
+  }
+  .modal-actions button:hover{ transform: translateY(-1px); filter:brightness(1.05); }
+  #cancelBtn{ background: #eee3d0; color: var(--ink); }
+  #confirmBtn{ background: linear-gradient(180deg, var(--coral), var(--coral-deep)); color: var(--paper); }
+
+  /* ---------- TRANSITION ---------- */
+  .transition-circle{
+    position:fixed;
+    top:0; left:0;
+    width:12px; height:12px;
+    border-radius:50%;
+    background: radial-gradient(circle, #0a0603 0%, #000000 55%, #000000 100%);
+    transform: translate(-50%,-50%) scale(0);
+    z-index:400;
+    pointer-events:none;
+  }
+  .transition-circle.grow{
+    transition: transform 1.05s cubic-bezier(.5,0,.2,1);
+    transform: translate(-50%,-50%) scale(320);
+  }
+
+  .transition-text{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:10px;
+    color: var(--paper);
+    opacity:0;
+    z-index:401;
+    pointer-events:none;
+    transition: opacity .5s ease;
+    text-align:center;
+    padding: 0 24px;
+  }
+  .transition-text.show{ opacity:1; }
+  .transition-text .welcome{
+    font-family:"Fraunces", serif;
+    font-style:italic;
+    font-weight:600;
+    font-size: clamp(24px, 4vw, 34px);
+  }
+  .transition-text .note{
+    font-size:13px;
+    letter-spacing:.05em;
+    color: rgba(255,255,255,0.55);
+  }
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width: 900px){
+    .hero{
+      grid-template-columns: 1fr;
+      justify-items:center;
+      text-align:center;
+      gap:32px;
+      padding-top:36px;
+    }
+    .left-col{ align-items:center; }
+    .quote{ border-left:none; border-top:3px solid var(--wood-light); padding-left:0; padding-top:12px; }
+    .right-col{ justify-self:center; flex-direction:row-reverse; align-items:flex-end; gap:14px; }
+    .speech-bubble::after, .speech-bubble::before{ left: 12%; }
+  }
+
+  /* ================= 3D ROOM SCENE ================= */
+  .room-scene{
+    position:fixed;
+    inset:0;
+    display:none;
+    background:#bfe0e8;
+    z-index:50;
+  }
+  .room-scene.active{ display:block; }
+
+  #roomCanvas{
+    position:absolute;
+    inset:0;
+    display:block;
+    width:100%;
+    height:100%;
+    cursor: grab;
+  }
+  #roomCanvas.dragging{ cursor: grabbing; }
+  #roomCanvas.hovering{ cursor: pointer; }
+
+  .room-hud-left{
+    position:absolute;
+    top:20px; left:20px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    z-index:60;
+    width:180px;
+  }
+
+  .room-logo{
+    font-family:"Fraunces", serif;
+    font-weight:800;
+    font-style:italic;
+    font-size:18px;
+    color:var(--paper);
+    text-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .room-logo span{ color: var(--gold); }
+
+  .minimap-canvas{
+    width:180px; height:180px;
+    background: rgba(239,231,216,0.94);
+    border:3px solid var(--ink);
+    border-radius:14px;
+    box-shadow: var(--shadow);
+    display:block;
+  }
+
+  .zone-progress{
+    background: rgba(43,35,28,0.4);
+    backdrop-filter: blur(4px);
+    border-radius:14px;
+    padding:12px 14px;
+    max-height: 38vh;
+    overflow-y:auto;
+  }
+  .zone-progress h3{
+    margin:0 0 8px;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.08em;
+    color: rgba(255,255,255,0.75);
+    text-transform:uppercase;
+  }
+  .zone-progress ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  .zone-progress li{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    font-size:12.5px;
+    color: var(--paper);
+    background: rgba(255,255,255,0.08);
+    border-radius:8px;
+    padding:6px 9px;
+  }
+  .zone-progress .zname{ display:flex; align-items:center; gap:7px; font-weight:700; }
+  .zone-progress .zdot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .zone-progress .zstatus{
+    font-size:11px;
+    font-weight:700;
+    padding:2px 7px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .zone-progress .zstatus.pending{ background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
+  .zone-progress .zstatus.partial{ background: var(--gold); color: var(--ink); }
+  .zone-progress .zstatus.done{ background: #6fbf8b; color: #103018; }
+
+  .room-hud-right{
+    position:absolute;
+    top:16px; right:16px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    z-index:60;
+  }
+
+  .hud-icon{
+    width:46px; height:46px;
+    border-radius:50%;
+    border:none;
+    background: var(--paper);
+    color: var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    box-shadow: var(--shadow);
+    transition: transform .15s ease, background .15s ease;
+  }
+  .hud-icon svg{ width:20px; height:20px; }
+  .hud-icon:hover{ transform: translateY(-2px) scale(1.04); background: var(--gold); }
+  .hud-icon:active{ transform: translateY(0) scale(0.98); }
+
+  .controls-hint{
+    position:absolute;
+    bottom:24px; left:24px;
+    z-index:60;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:6px;
+    background: rgba(43,35,28,0.35);
+    backdrop-filter: blur(4px);
+    padding:14px 16px;
+    border-radius:14px;
+  }
+  .controls-hint .key-row{ display:flex; gap:6px; }
+  .controls-hint .key{
+    width:30px; height:30px;
+    display:flex; align-items:center; justify-content:center;
+    background: var(--paper);
+    border-radius:7px;
+    font-weight:800;
+    font-size:13px;
+    color: var(--ink);
+    box-shadow: 0 3px 0 rgba(0,0,0,0.3);
+  }
+  .controls-hint p{
+    margin:6px 0 0;
+    font-size:11.5px;
+    color: var(--paper);
+    letter-spacing:.02em;
+    max-width:220px;
+    line-height:1.5;
+  }
+
+  /* -------- Stats modal (物品清單): header, tabs, item rows -------- */
+  .modal-card.stats-card{ width:min(560px, 94vw); text-align:left; }
+
+  .stats-card-header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:4px;
+  }
+  .stats-card-header h2{ margin:0; font-size:22px; }
+  .stats-card-header p{ margin:4px 0 0; }
+
+  .modal-x{
+    flex-shrink:0;
+    width:34px; height:34px;
+    border:none;
+    border-radius:8px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size:16px;
+    line-height:1;
+    cursor:pointer;
+    transition: transform .15s ease, background .15s ease;
+  }
+  .modal-x:hover{ transform: translateY(-1px); background:#000; }
+
+  .stats-tabs{
+    display:flex;
+    gap:6px;
+    overflow-x:auto;
+    margin:14px 0 4px;
+    padding-bottom:4px;
+  }
+  .stats-tab{
+    flex-shrink:0;
+    border:none;
+    border-radius:9px;
+    padding:9px 14px;
+    font-family:"Noto Sans TC",sans-serif;
+    font-weight:700;
+    font-size:13px;
+    color: rgba(255,255,255,0.92);
+    cursor:pointer;
+    opacity:.6;
+    transition: opacity .15s ease, transform .15s ease;
+  }
+  .stats-tab.active{ opacity:1; transform: translateY(-1px); box-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+
+  .furniture-list{
+    list-style:none;
+    margin:8px 0 4px;
+    padding:0;
+    max-height:min(46vh, 360px);
+    overflow-y:auto;
+    text-align:left;
+    background: #fbf3e2;
+    border-radius:12px;
+    padding:6px 10px;
+  }
+  .furniture-list li{
+    display:grid;
+    grid-template-columns: minmax(64px,1fr) auto minmax(90px,1.4fr) auto auto;
+    align-items:center;
+    gap:10px;
+    padding:11px 4px;
+    border-bottom:1px solid #eee0c9;
+    font-size:13.5px;
+  }
+  .furniture-list li:last-child{ border-bottom:none; }
+  .furniture-list .item-name{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .furniture-list .item-keep{ font-size:12px; color:#2f7d4f; font-weight:700; white-space:nowrap; }
+  .furniture-list .item-discard{ font-size:12px; color:#c1503a; font-weight:700; white-space:nowrap; }
+  .furniture-list .item-bar{
+    display:flex;
+    height:8px;
+    width:100%;
+    border-radius:999px;
+    overflow:hidden;
+    background:#f1cfc6;
+  }
+  .furniture-list .bar-keep{ background:#3fa066; height:100%; }
+  .furniture-list .bar-discard{ background:#df6b4e; height:100%; }
+  .item-eye{
+    width:30px; height:30px;
+    border-radius:50%;
+    border:none;
+    background: var(--ink);
+    color: var(--paper);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    transition: transform .15s ease, background .15s ease;
+  }
+  .item-eye:hover{ transform: scale(1.08); background:#000; }
+  .item-eye svg{ width:15px; height:15px; }
+
+  /* -------- Item detail modal (物品詳細檢視) -------- */
+  .modal-overlay.detail-overlay{ z-index:310; }
+  .modal-card.detail-card{ width:min(620px, 94vw); text-align:left; position:relative; }
+  .detail-card .modal-x{ position:absolute; top:0; right:0; }
+  .detail-body{
+    display:flex;
+    gap:22px;
+    margin-top:8px;
+    flex-wrap:wrap;
+  }
+  .detail-image{
+    width:220px; height:220px;
+    flex-shrink:0;
+    border-radius:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow: inset 0 0 0 3px rgba(0,0,0,0.12);
+  }
+  .detail-image svg{ width:96px; height:96px; opacity:.85; }
+  .detail-info{ flex:1; min-width:200px; display:flex; flex-direction:column; }
+  .detail-info h3{ margin:0 0 10px; font-family:"Fraunces", serif; font-size:20px; }
+  .detail-info .detail-percentages{ display:flex; gap:14px; margin-bottom:10px; font-size:13px; font-weight:700; }
+  .detail-info .detail-percentages .keep{ color:#2f7d4f; }
+  .detail-info .detail-percentages .discard{ color:#c1503a; }
+  .detail-info p.detail-desc{
+    margin:0 0 18px;
+    font-size:13.5px;
+    line-height:1.8;
+    color: var(--ink-soft);
+    flex:1;
+  }
+
+  .modal-actions.single button{ flex:none; width:100%; }
+
+  /* ================= Swipe (斷捨離) scene ================= */
+  .swipe-scene{
+    position:fixed;
+    inset:0;
+    display:none;
+    flex-direction:column;
+    background: rgba(255,255,255,0.8);
+    z-index:120; /* above the 3D room (50), below toast (500) */
+    --card-w: min(340px, 86vw);
+  }
+  .swipe-scene.active{ display:flex; }
+
+  .swipe-topbar{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding: 18px clamp(16px, 4vw, 40px) 6px;
+  }
+  .swipe-x{
+    flex-shrink:0;
+    width:40px; height:40px;
+    border:none;
+    border-radius:10px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size:17px;
+    cursor:pointer;
+    transition: transform .15s ease;
+  }
+  .swipe-x:hover{ transform: translateY(-1px); }
+
+  /* centered on its own, matching the card width below, regardless of
+     the (asymmetric) X button and icon-column widths on either side */
+  .swipe-zone-info{
+    flex:0 1 var(--card-w);
+    width:var(--card-w);
+    margin:0 auto;
+    text-align:center;
+  }
+  .swipe-zone-name{
+    font-family:"Fraunces", serif;
+    font-weight:700;
+    font-size:18px;
+    color: var(--ink);
+    margin-bottom:6px;
+  }
+  .swipe-progress-track{
+    width:100%;
+    height:8px;
+    border-radius:999px;
+    background: rgba(43,35,28,0.12);
+    overflow:hidden;
+  }
+  .swipe-progress-fill{
+    height:100%;
+    width:0%;
+    background: linear-gradient(90deg, var(--coral), var(--gold));
+    border-radius:999px;
+    transition: width .3s ease;
+  }
+
+  .swipe-hud-right{ flex-shrink:0; display:flex; gap:10px; }
+  .swipe-hud-right .hud-icon{ width:40px; height:40px; box-shadow: 0 6px 14px rgba(43,25,14,0.16); }
+  .swipe-hud-right .hud-icon svg{ width:18px; height:18px; }
+
+  .swipe-count{
+    text-align:center;
+    font-size:13px;
+    font-weight:700;
+    color: var(--ink-soft);
+    letter-spacing:.04em;
+    margin: 2px 0 8px;
+  }
+
+  .swipe-card-stack{
+    position:relative;
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 18px clamp(16px, 6vw, 60px);
+  }
+
+  .swipe-card{
+    position:absolute;
+    inset:0;
+    margin:auto;
+    width:var(--card-w);
+    height:min(480px, 62vh);
+    background: var(--paper);
+    border-radius:22px;
+    box-shadow: 0 24px 48px rgba(43,25,14,0.28);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    user-select:none;
+    touch-action:none;
+    cursor: grab;
+    will-change: transform;
+    transition: transform .35s cubic-bezier(.22,.85,.32,1), opacity .35s ease;
+  }
+  .swipe-card:active{ cursor: grabbing; }
+  .swipe-card.no-anim{ transition:none !important; }
+  .swipe-card.dragging{ transition:none; }
+  .swipe-card.fly-out{ transition: transform .4s ease, opacity .4s ease; opacity:0; }
+
+  /* Stack depth via z-index (not DOM order), so promoting a card just
+     means swapping its slot class — the real image/name underneath is
+     visible the whole time, no gray placeholder. */
+  .swipe-card.swipe-slot-0{ z-index:50; transform: translateY(0) scale(1); opacity:1; }
+  .swipe-card.swipe-slot-1{ z-index:40; transform: translateY(7px) scale(0.975); opacity:0.92; pointer-events:none; }
+  .swipe-card.swipe-slot-2{ z-index:30; transform: translateY(14px) scale(0.95); opacity:0.85; pointer-events:none; }
+  .swipe-card.swipe-slot-3{ z-index:20; transform: translateY(21px) scale(0.925); opacity:0.78; pointer-events:none; }
+  .swipe-card.swipe-slot-4{ z-index:10; transform: translateY(28px) scale(0.9); opacity:0.7; pointer-events:none; }
+  .swipe-card.swipe-slot-hidden{ z-index:0; transform: translateY(28px) scale(0.9); opacity:0; pointer-events:none; }
+
+  .swipe-card-image{
+    height:56%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+  }
+  .swipe-card-image svg{ width:30%; height:30%; opacity:.85; color: rgba(0,0,0,0.55); }
+
+  .swipe-card-body{
+    flex:1;
+    padding:16px 20px 20px;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
+  .swipe-card-header{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    margin-bottom:8px;
+  }
+  .swipe-card-header h3{
+    margin:0;
+    font-family:"Fraunces", serif;
+    font-size:19px;
+    color: var(--ink);
+  }
+  .swipe-card-header .hold-tag{
+    flex-shrink:0;
+    font-size:14px;
+    font-weight:500;
+    color: var(--ink-soft);
+    white-space:nowrap;
+  }
+  .swipe-card-desc{
+    margin:0;
+    font-size:13.5px;
+    line-height:1.8;
+    color: var(--ink-soft);
+    overflow-y:auto;
+  }
+
+  .swipe-card-overlay{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:"Fraunces", serif;
+    font-weight:800;
+    font-style:italic;
+    font-size:34px;
+    color:#fff;
+    opacity:0;
+    pointer-events:none;
+    border-radius:22px;
+  }
+  .keep-overlay{ background: rgba(76,175,80,0.4); }
+  .discard-overlay{ background: rgba(239,83,80,0.4); }
+
+  .swipe-actions{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:22px;
+    padding: 10px 0 clamp(20px, 4vh, 40px);
+  }
+  .swipe-action{
+    border:none;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    box-shadow: 0 12px 22px rgba(43,25,14,0.2);
+    transition: transform .15s ease;
+    color:#fff;
+  }
+  .swipe-action:hover{ transform: translateY(-2px) scale(1.05); }
+  .swipe-action:active{ transform: translateY(0) scale(0.96); }
+  .swipe-action.keep{ width:60px; height:60px; background: #4caf50; }
+  .swipe-action.discard{ width:60px; height:60px; background: #ef5350; }
+  .swipe-action.undo{ width:48px; height:48px; background: var(--ink-soft); }
+  .swipe-action svg{ width:26px; height:26px; }
+  .swipe-action.undo svg{ width:20px; height:20px; }
+
+  /* Zone summary modal */
+  .modal-card.summary-card{ text-align:center; }
+  .summary-emoji{ font-size:44px; margin-bottom:6px; }
+  .summary-stats{
+    display:flex;
+    justify-content:center;
+    gap:28px;
+    margin:18px 0 6px;
+  }
+  .summary-stat{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .summary-stat .num{ font-family:"Fraunces", serif; font-size:28px; font-weight:700; }
+  .summary-stat.keep .num{ color:#2f7d4f; }
+  .summary-stat.discard .num{ color:#c1503a; }
+  .summary-stat .label{ font-size:12px; color: var(--ink-soft); font-weight:700; }
+
+  @media (max-width: 720px){
+    .room-hud-left{ width:130px; }
+    .minimap-canvas{ width:130px; height:130px; }
+    .zone-progress{ max-height:26vh; }
+    .controls-hint p{ max-width:160px; }
+    .furniture-list li{ grid-template-columns: minmax(50px,1fr) auto minmax(70px,1fr) auto auto; font-size:12px; }
+    .detail-body{ flex-direction:column; align-items:center; text-align:center; }
+    .detail-info .detail-percentages{ justify-content:center; }
+    .swipe-topbar{ flex-wrap:wrap; }
+    .swipe-hud-right{ order:3; width:100%; justify-content:center; margin-top:8px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="scene">
+    <section class="hero">
+
+      <div class="left-col">
+        <span class="eyebrow">A tiny ritual</span>
+        <h1 class="title">
+          <span>Clean</span>
+          <span>My</span>
+          <span class="accent">Room</span>
+        </h1>
+        <blockquote class="quote">
+          「你佔有的東西，最終佔有了你。」
+          <cite>—— 帕拉尼克《鬥陣俱樂部》</cite>
+        </blockquote>
+      </div>
+
+      <div class="center-col">
+        <button class="board-btn" id="boardBtn" type="button">留言板</button>
+
+        <button class="door-wrap" id="doorWrap" type="button" aria-label="點擊房門，進入房間">
+          <div class="door-glow" aria-hidden="true"></div>
+          <div class="door-frame">
+            <div class="door" id="door">
+              <div class="door-panel top"></div>
+              <div class="door-panel bottom"></div>
+              <div class="door-handle"></div>
+              <div class="door-keyhole"></div>
+            </div>
+          </div>
+        </button>
+        <span class="hint">點擊房門，進入房間</span>
+      </div>
+
+      <div class="right-col">
+        <div class="speech-bubble" id="speechBubble">已有 <strong>0</strong> 人幫助斷捨離，<br>謝謝你~陌生人，歡迎留言</div>
+        <svg class="avatar" viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="100" cy="248" rx="70" ry="10" fill="rgba(43,25,14,0.12)"/>
+          <path d="M40 260 L48 150 Q100 120 152 150 L160 260 Z" fill="#b9bfc6"/>
+          <path d="M48 150 Q100 128 152 150 L152 168 Q100 146 48 168 Z" fill="#ffffff"/>
+          <rect x="30" y="230" width="34" height="30" rx="8" fill="#e8a84f"/>
+          <path d="M96 132 C70 132 55 122 60 172 C63 200 78 210 100 210 C122 210 137 200 140 172 C145 122 130 132 96 132 Z" fill="#f3c8a6"/>
+          <path d="M60 128 Q52 92 100 84 Q148 92 140 128 Q140 96 100 100 Q60 96 60 128 Z" fill="#8a4a2c"/>
+          <circle cx="80" cy="150" r="5" fill="#2b231c"/>
+          <circle cx="120" cy="150" r="5" fill="#2b231c"/>
+          <path d="M84 172 Q100 182 116 172" stroke="#2b231c" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <ellipse cx="66" cy="160" rx="8" ry="5" fill="#f0a98f" opacity="0.7"/>
+          <ellipse cx="134" cy="160" rx="8" ry="5" fill="#f0a98f" opacity="0.7"/>
+          <path d="M150 175 Q182 165 190 130" stroke="#f3c8a6" stroke-width="16" fill="none" stroke-linecap="round"/>
+          <g transform="translate(178,108)">
+            <rect x="-5" y="-6" width="8" height="26" rx="4" fill="#f3c8a6"/>
+            <rect x="4" y="-14" width="8" height="30" rx="4" fill="#f3c8a6"/>
+            <rect x="-12" y="6" width="8" height="18" rx="4" fill="#f3c8a6"/>
+          </g>
+        </svg>
+      </div>
+
+    </section>
+
+    <div class="floor">
+      <div class="guinea-wrap idle" id="guineaWrap">
+        <div class="guinea-bubble" id="guineaBubble">5151</div>
+        <svg class="guinea-pig" viewBox="0 0 120 70" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="60" cy="60" rx="42" ry="7" fill="rgba(0,0,0,0.25)"/>
+          <path d="M14 42 C10 20 34 10 62 10 C92 10 108 24 108 42 C108 56 92 60 60 60 C30 60 16 56 14 42 Z" fill="#e0a53d"/>
+          <path d="M18 44 C16 28 34 16 60 16 C58 30 46 40 30 44 C25 46 20 46 18 44 Z" fill="#fff6e8"/>
+          <path d="M60 60 C40 60 26 57 18 47 C24 55 40 58 60 58 C80 58 96 54 102 46 C94 56 80 60 60 60 Z" fill="#c98328"/>
+          <circle cx="24" cy="34" r="4.5" fill="#2b231c"/>
+          <ellipse cx="15" cy="40" rx="4" ry="3" fill="#e08a5c"/>
+          <path d="M10 26 Q6 18 14 16 Q16 22 12 28 Z" fill="#e0a53d"/>
+          <path d="M22 20 Q20 12 28 12 Q28 18 24 22 Z" fill="#e0a53d"/>
+          <rect x="26" y="56" width="6" height="10" rx="2" fill="#e0a53d"/>
+          <rect x="46" y="58" width="6" height="10" rx="2" fill="#e0a53d"/>
+          <rect x="72" y="58" width="6" height="10" rx="2" fill="#c98328"/>
+          <rect x="92" y="56" width="6" height="10" rx="2" fill="#c98328"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Name modal -->
+  <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <h2 id="modalTitle">在你進去之前……</h2>
+      <p>想一個名字，讓房間記得你</p>
+      <input id="nameInput" type="text" placeholder="你的名稱" maxlength="12" autocomplete="off">
+      <div class="modal-actions">
+        <button id="cancelBtn" type="button">取消</button>
+        <button id="confirmBtn" type="button">確認</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transition -->
+  <div class="transition-circle" id="transitionCircle" aria-hidden="true"></div>
+  <div class="transition-text" id="transitionText" aria-live="polite">
+    <div class="welcome" id="welcomeText"></div>
+    <div class="note" id="transitionNote"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- ================= 3D ROOM SCENE ================= -->
+  <div class="room-scene" id="roomScene">
+    <canvas id="roomCanvas"></canvas>
+
+    <div class="room-hud-left">
+      <div class="room-logo">Clean <span>My</span> Room</div>
+      <canvas class="minimap-canvas" id="minimapCanvas" width="160" height="160" aria-label="房間頂視小地圖"></canvas>
+      <div class="zone-progress">
+        <h3>區域進度</h3>
+        <ul id="zoneProgressList"></ul>
+      </div>
+    </div>
+
+    <div class="controls-hint">
+      <div class="key-row"><span class="key">W</span></div>
+      <div class="key-row"><span class="key">A</span><span class="key">S</span><span class="key">D</span></div>
+      <p>WASD 移動・拖曳滑鼠環顧四周<br>左鍵點擊家具互動</p>
+    </div>
+
+    <div class="room-hud-right">
+      <button class="hud-icon" id="homeIcon" type="button" aria-label="回到首頁" title="回到首頁">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M9.5 20v-6h5v6"/></svg>
+      </button>
+      <button class="hud-icon" id="statsIcon" type="button" aria-label="詳細物品統計" title="詳細物品統計">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><circle cx="20" cy="18" r="1.6" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button class="hud-icon" id="chatIcon" type="button" aria-label="留言區" title="留言區">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Furniture interaction modal -->
+  <div class="modal-overlay" id="furnitureModalOverlay" role="dialog" aria-modal="true" aria-labelledby="furnitureModalTitle">
+    <div class="modal-card">
+      <h2 id="furnitureModalTitle">是否開始整理？</h2>
+      <p id="furnitureModalDesc">你將有 0 件物品需要篩選</p>
+      <div class="modal-actions">
+        <button id="furnitureCancelBtn" type="button">取消</button>
+        <button id="furnitureConfirmBtn" type="button">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Item stats modal (物品清單) -->
+  <div class="modal-overlay" id="statsModalOverlay" role="dialog" aria-modal="true" aria-labelledby="statsModalTitle">
+    <div class="modal-card stats-card">
+      <div class="stats-card-header">
+        <div>
+          <h2 id="statsModalTitle">物品清單</h2>
+          <p>依 7 個區域分類，捲動查看所有物品（示範資料）</p>
+        </div>
+        <button class="modal-x" id="statsCloseBtn" type="button" aria-label="關閉">✕</button>
+      </div>
+      <div class="stats-tabs" id="statsTabs"></div>
+      <ul class="furniture-list" id="furnitureList"></ul>
+    </div>
+  </div>
+
+  <!-- Item detail modal (物品詳細檢視) -->
+  <div class="modal-overlay detail-overlay" id="itemDetailModalOverlay" role="dialog" aria-modal="true" aria-labelledby="detailName">
+    <div class="modal-card detail-card">
+      <button class="modal-x" id="itemDetailCloseBtn" type="button" aria-label="關閉">✕</button>
+      <div class="detail-body">
+        <div class="detail-image" id="detailImage"></div>
+        <div class="detail-info">
+          <h3 id="detailName"></h3>
+          <div class="detail-percentages">
+            <span class="keep" id="detailKeep"></span>
+            <span class="discard" id="detailDiscard"></span>
+          </div>
+          <p class="detail-desc" id="detailDesc"></p>
+          <div class="modal-actions single">
+            <button id="detailBackBtn" type="button">返回列表</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Swipe (斷捨離) scene ================= -->
+  <div class="swipe-scene" id="swipeScene">
+    <div class="swipe-topbar">
+      <button class="swipe-x" id="swipeCloseBtn" type="button" aria-label="關閉整理">✕</button>
+      <div class="swipe-zone-info">
+        <div class="swipe-zone-name" id="swipeZoneName">大衣櫃</div>
+        <div class="swipe-count"><span id="swipeCurrent">1</span> / <span id="swipeTotal">8</span></div>
+        <div class="swipe-progress-track"><div class="swipe-progress-fill" id="swipeProgressFill"></div></div>
+      </div>
+      <div class="swipe-hud-right">
+        <button class="hud-icon" id="swipeHomeIcon" type="button" aria-label="回到首頁" title="回到首頁">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M9.5 20v-6h5v6"/></svg>
+        </button>
+        <button class="hud-icon" id="swipeStatsIcon" type="button" aria-label="房間物品統計" title="房間物品統計">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><circle cx="20" cy="18" r="1.6" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button class="hud-icon" id="swipeChatIcon" type="button" aria-label="留言區" title="留言區">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="swipe-card-stack" id="swipeCardStack"></div>
+
+    <div class="swipe-actions">
+      <button class="swipe-action keep" id="swipeKeepBtn" type="button" aria-label="留下">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5-9 5-9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+      </button>
+      <button class="swipe-action undo" id="swipeUndoBtn" type="button" aria-label="返回上一張">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H9"/></svg>
+      </button>
+      <button class="swipe-action discard" id="swipeDiscardBtn" type="button" aria-label="丟掉">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Zone completion summary modal -->
+  <div class="modal-overlay" id="summaryModalOverlay" role="dialog" aria-modal="true" aria-labelledby="summaryTitle">
+    <div class="modal-card summary-card">
+      <div class="summary-emoji" id="summaryEmoji">🎉</div>
+      <h2 id="summaryTitle">斷捨離大師！</h2>
+      <p id="summaryDesc">這區的物品已經全部篩選完成。</p>
+      <div class="summary-stats">
+        <div class="summary-stat keep"><span class="num" id="summaryKeepCount">0</span><span class="label">留下</span></div>
+        <div class="summary-stat discard"><span class="num" id="summaryDiscardCount">0</span><span class="label">丟掉</span></div>
+      </div>
+      <div class="modal-actions">
+        <button id="summaryRetryBtn" type="button">重新篩選該區</button>
+        <button id="summaryDoneBtn" type="button">回到 3D 房間</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reusable confirm dialog (X close / home icon, etc.) -->
+  <div class="modal-overlay" id="confirmDialogOverlay" role="dialog" aria-modal="true" aria-labelledby="confirmDialogTitle">
+    <div class="modal-card">
+      <h2 id="confirmDialogTitle">確定要離開嗎？</h2>
+      <p id="confirmDialogDesc"></p>
+      <div class="modal-actions">
+        <button id="confirmDialogCancelBtn" type="button">取消</button>
+        <button id="confirmDialogConfirmBtn" type="button">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Three.js (loaded from cdnjs; safe to swap versions)
+  ============================================================= -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!--
+    GLTFLoader placeholder — uncomment when room.glb is ready to swap in
+    for the placeholder cubes. Load order matters: this script must come
+    after three.min.js above.
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js"></script>
+  -->
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- Toast helper ---------------- */
+  var toastEl = document.getElementById('toast');
+  var toastTimer = null;
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2200);
+  }
+
+  document.getElementById('boardBtn').addEventListener('click', function(){
+    showToast('留言板即將推出，敬請期待 📌');
+  });
+
+  /* ---------------- Visitor counter (speech bubble) ----------------
+     Simulates a "unique ID" dedup: a visitor id is generated once and
+     stored in localStorage. If it's missing, this is treated as a new
+     unique visitor and the count is bumped by one. Swap the body of
+     fetchVisitorCount() for a real API call when the backend is ready —
+     the localStorage path stays as an offline fallback.
+  ------------------------------------------------------------------- */
+  var VISITOR_ID_KEY = 'cmr_visitor_id';
+  var VISITOR_COUNT_KEY = 'cmr_visitor_count_v1';
+  var DEMO_SEED_COUNT = 128; // starting number for the local demo only
+
+  function getOrCreateVisitorId(){
+    var id = localStorage.getItem(VISITOR_ID_KEY);
+    if (id) return { id: id, isNew: false };
+    id = (window.crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'v-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+    localStorage.setItem(VISITOR_ID_KEY, id);
+    return { id: id, isNew: true };
+  }
+
+  function fetchVisitorCount(done){
+    // ---------------------------------------------------------------
+    // Real API hookup (uncomment once the backend endpoint exists):
+    //
+    // var visitor = getOrCreateVisitorId();
+    // fetch('/api/visitors/count', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ visitorId: visitor.id })
+    // })
+    //   .then(function(res){ return res.json(); })
+    //   .then(function(data){ done(data.count); })
+    //   .catch(function(){ done(getLocalCount()); }); // offline fallback
+    // return;
+    // ---------------------------------------------------------------
+
+    // ---- Local demo fallback (no backend yet) ----
+    var visitor = getOrCreateVisitorId();
+    var count = getLocalCount();
+    if (visitor.isNew){
+      count += 1;
+      setLocalCount(count);
+    }
+    done(count);
+  }
+
+  function getLocalCount(){
+    var n = parseInt(localStorage.getItem(VISITOR_COUNT_KEY) || '', 10);
+    return isNaN(n) ? DEMO_SEED_COUNT : n;
+  }
+  function setLocalCount(n){ localStorage.setItem(VISITOR_COUNT_KEY, String(n)); }
+
+  function initVisitorCounter(){
+    var speechEl = document.getElementById('speechBubble');
+    fetchVisitorCount(function(count){
+      if (!speechEl) return;
+      speechEl.innerHTML = '已有 <strong>' + count + '</strong> 人幫助斷捨離，<br>謝謝你~陌生人，歡迎留言';
+    });
+  }
+  initVisitorCounter();
+
+  /* ---------------- Guinea pig wander ---------------- */
+  var wrap = document.getElementById('guineaWrap');
+  var isHovering = false;
+  var wanderTimeout = null;
+  var currentLeft = 20;
+  var minLeft = 4, maxLeft = 92;
+
+  function scheduleWander(delay){
+    clearTimeout(wanderTimeout);
+    wanderTimeout = setTimeout(step, delay);
+  }
+
+  function step(){
+    if (isHovering){ scheduleWander(400); return; }
+
+    var target = minLeft + Math.random() * (maxLeft - minLeft);
+    var distance = Math.abs(target - currentLeft);
+    var duration = Math.max(1.1, Math.min(4.5, distance / 12));
+
+    wrap.style.transitionDuration = duration + 's';
+    wrap.classList.toggle('face-left', target < currentLeft);
+    wrap.classList.remove('idle');
+
+    currentLeft = target;
+    wrap.style.left = target + '%';
+
+    scheduleWander(duration * 1000 + 600 + Math.random() * 1400);
+
+    setTimeout(function(){
+      if (!isHovering) wrap.classList.add('idle');
+    }, duration * 1000);
+  }
+
+  wrap.addEventListener('mouseenter', function(){
+    isHovering = true;
+    wrap.classList.add('idle');
+    // freeze mid-walk at current computed position
+    var pct = (wrap.getBoundingClientRect().left / window.innerWidth) * 100;
+    wrap.style.transitionDuration = '0s';
+    currentLeft = Math.max(minLeft, Math.min(maxLeft, pct));
+    wrap.style.left = currentLeft + '%';
+  });
+  wrap.addEventListener('mouseleave', function(){
+    isHovering = false;
+    scheduleWander(300);
+  });
+  wrap.addEventListener('focus', function(){ wrap.dispatchEvent(new Event('mouseenter')); });
+  wrap.addEventListener('blur', function(){ wrap.dispatchEvent(new Event('mouseleave')); });
+
+  scheduleWander(1200);
+
+  /* ---------------- Modal ---------------- */
+  var doorWrap = document.getElementById('doorWrap');
+  var door = document.getElementById('door');
+  var modalOverlay = document.getElementById('modalOverlay');
+  var nameInput = document.getElementById('nameInput');
+  var cancelBtn = document.getElementById('cancelBtn');
+  var confirmBtn = document.getElementById('confirmBtn');
+  var transitionCircle = document.getElementById('transitionCircle');
+  var transitionText = document.getElementById('transitionText');
+  var welcomeText = document.getElementById('welcomeText');
+
+  var isTransitioning = false;
+
+  function openModal(){
+    if (isTransitioning) return;
+    modalOverlay.classList.add('active');
+    setTimeout(function(){ nameInput.focus(); }, 200);
+  }
+  function closeModal(){
+    modalOverlay.classList.remove('active');
+    nameInput.value = '';
+    nameInput.classList.remove('shake');
+  }
+
+  doorWrap.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', function(e){
+    if (e.target === modalOverlay) closeModal();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && modalOverlay.classList.contains('active')) closeModal();
+  });
+  nameInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') confirmBtn.click();
+  });
+
+  confirmBtn.addEventListener('click', function(){
+    var name = nameInput.value.trim();
+    if (!name){
+      nameInput.classList.remove('shake');
+      void nameInput.offsetWidth;
+      nameInput.classList.add('shake');
+      nameInput.focus();
+      return;
+    }
+    closeModal();
+    setTimeout(function(){ playEntrance(name); }, 220);
+  });
+
+  var sceneEl = document.querySelector('.scene');
+  var transitionNote = document.getElementById('transitionNote');
+
+  function playEntrance(name){
+    isTransitioning = true;
+
+    // position the black circle's origin at the door's screen center
+    var rect = doorWrap.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2;
+    var cy = rect.top + rect.height / 2;
+    transitionCircle.style.left = cx + 'px';
+    transitionCircle.style.top = cy + 'px';
+
+    // 1) door swings open
+    door.classList.add('is-open');
+
+    // 2) black gradient begins enlarging shortly after
+    setTimeout(function(){
+      transitionCircle.classList.add('grow');
+    }, 420);
+
+    // 3) welcome message fades in once the screen is fully covered
+    setTimeout(function(){
+      welcomeText.textContent = '歡迎回來，' + name;
+      transitionNote.textContent = '正在為你打開房間……';
+      transitionText.classList.add('show');
+    }, 1500);
+
+    // 4) while the screen is black, swap the landing page out for the 3D room
+    setTimeout(function(){
+      transitionText.classList.remove('show');
+      sceneEl.style.display = 'none';
+      door.classList.remove('is-open');
+      enterRoomScene();
+    }, 2600);
+
+    // 5) shrink the black circle back down to reveal the 3D room
+    setTimeout(function(){
+      transitionCircle.classList.remove('grow');
+      transitionCircle.style.transitionDuration = '0s';
+      requestAnimationFrame(function(){
+        transitionCircle.style.left = '50%';
+        transitionCircle.style.top = '50%';
+        setTimeout(function(){
+          transitionCircle.style.transitionDuration = '';
+          isTransitioning = false;
+        }, 50);
+      });
+    }, 3000);
+  }
+
+  // returning from the 3D room back to the landing page
+  function playExit(originX, originY){
+    isTransitioning = true;
+    transitionCircle.style.left = originX + 'px';
+    transitionCircle.style.top = originY + 'px';
+    transitionCircle.style.transitionDuration = '';
+
+    requestAnimationFrame(function(){
+      transitionCircle.classList.add('grow');
+    });
+
+    setTimeout(function(){
+      leaveRoomScene();
+      sceneEl.style.display = '';
+    }, 750);
+
+    setTimeout(function(){
+      transitionCircle.classList.remove('grow');
+      transitionCircle.style.transitionDuration = '0s';
+      requestAnimationFrame(function(){
+        transitionCircle.style.left = '50%';
+        transitionCircle.style.top = '50%';
+        setTimeout(function(){
+          transitionCircle.style.transitionDuration = '';
+          isTransitioning = false;
+        }, 50);
+      });
+    }, 1150);
+  }
+
+  /* ================================================================
+     3D ROOM SCENE (Three.js)
+     ================================================================ */
+
+  /* ----------------------------------------------------------------
+     Furniture config — Blender naming spec (parent mesh + child
+     animated sub-parts). Each child gets its own AnimationMixer/action
+     so e.g. a desk's two drawers can slide independently. These exact
+     strings are used by buildFurniture() (mesh.name for the parent and
+     each child) and by the GLTFLoader placeholder below.
+  ----------------------------------------------------------------- */
+  var FURNITURE_CONFIG = [
+    {
+      id:'desk', label:'書桌', color:0xdf6b4e, size:[2.4, 1.0, 1.2], pos:[-5.4, 0.5, -7.2],
+      parentName:'Desk',
+      children:[
+        { name:'Desk_drawer_01', action:'Desk_drawer_01_open', type:'slideZ', local:[-0.6, -0.15, 0.6], size:[0.95, 0.32, 0.5] },
+        { name:'Desk_drawer_02', action:'Desk_drawer_02_open', type:'slideZ', local:[ 0.6, -0.15, 0.6], size:[0.95, 0.32, 0.5] }
+      ]
+    },
+    {
+      id:'large_wardrobe', label:'大衣櫃', color:0x4a2a1e, size:[1.6, 3.2, 1.0], pos:[-7.0, 1.6, -1.6],
+      parentName:'Large_wardrobe',
+      children:[
+        { name:'Large_wardrobe_door_01', action:'Large_wardrobe_door_01_open', type:'slideX', dir:-1, local:[-0.4, 0, 0.52], size:[0.76, 3.0, 0.08] },
+        { name:'Large_wardrobe_door_02', action:'Large_wardrobe_door_02_open', type:'slideX', dir: 1, local:[ 0.4, 0, 0.52], size:[0.76, 3.0, 0.08] }
+      ]
+    },
+    {
+      id:'bed', label:'床頭', color:0xe0a53d, size:[3.2, 0.9, 4.2], pos:[ 5.0, 0.45,-4.6],
+      parentName:'Bed',
+      children:[
+        { name:'Bed_pillow_01', action:'Bed_pillow_01_open', type:'lidRotate', local:[0, 0.5, -1.6], size:[2.6, 0.2, 1.0] }
+      ]
+    },
+    {
+      id:'wardrobe', label:'衣櫃', color:0x8c5236, size:[1.4, 2.6, 0.6], pos:[-7.0, 1.3,  3.4],
+      parentName:'Wardrobe',
+      children:[
+        { name:'Wardrobe_door_01',  action:'Wardrobe_door_01_open',  type:'slideX',   dir:-1, local:[0, 0.75, 0.32], size:[1.2, 1.0, 0.1] },
+        { name:'Wardrobe_door_02',  action:'Wardrobe_door_02_open',  type:'slideZ',   local:[-0.32, -0.35, 0.32], size:[0.55, 0.5, 0.15] },
+        { name:'Wardrobe_door_03',  action:'Wardrobe_door_03_open',  type:'slideZ',   local:[ 0.32, -0.35, 0.32], size:[0.55, 0.5, 0.15] }
+      ]
+    },
+    {
+      id:'low_cabinet', label:'矮櫃', color:0x4f8f8c, size:[3.6, 0.4, 2.0], pos:[ 0.0, 0.2, -9.0],
+      parentName:'Low_cabinet',
+      children:[
+        { name:'Low_cabinet_drawer_01', action:'Low_cabinet_drawer_01_open', type:'slideZ', local:[0, 0, 0.9], size:[3.0, 0.3, 0.4] }
+      ]
+    },
+    {
+      id:'long_cabinet', label:'長條櫃', color:0x7c9473, size:[1.6, 1.6, 1.0], pos:[ 6.6, 0.8,  1.8],
+      parentName:'Long_cabinet',
+      children:[
+        { name:'Long_cabinet_door_01', action:'Long_cabinet_door_01_open', type:'lidRotate', local:[0, 0.75, 0], size:[1.4, 0.15, 0.9] }
+      ]
+    },
+    {
+      id:'multi_tier_cabinet', label:'多層櫃', color:0xcf9f42, size:[0.8, 0.7, 0.8], pos:[ 6.6, 0.35,-6.4],
+      parentName:'Multi-tier_cabinet',
+      children:[
+        { name:'Multi-tier_cabinet_drawer_01', action:'Multi-tier_cabinet_drawer_01_open', type:'lidRotate', local:[0,  0.2, 0.3], size:[0.7, 0.14, 0.55] },
+        { name:'Multi-tier_cabinet_drawer_02', action:'Multi-tier_cabinet_drawer_02_open', type:'lidRotate', local:[0, -0.15, 0.3], size:[0.7, 0.14, 0.55] }
+      ]
+    }
+  ];
+  var ROOM_BOUNDS = { minX:-7.4, maxX:7.4, minZ:-9.0, maxZ:8.0 };
+
+  // per-furniture organizing progress (0–100), demo only — a real build
+  // would load/save this per user alongside the visitor-count API above.
+  var furnitureState = {};
+  FURNITURE_CONFIG.forEach(function(cfg){ furnitureState[cfg.id] = { progress: 0 }; });
+
+  // demo item data shown in the 物品清單 / 物品詳細 modals and used to seed
+  // each zone's swipe deck — swap for a real API response later; shape
+  // (id, name, keep%, holdTime, desc) stays the same.
+  var DEMO_ITEMS = {
+    desk: [
+      { id:'desk-1', name:'原子筆收納筒', keep:80, holdTime:'3年', desc:'桌上一直都有的老朋友，還在用，留下來繼續陪你辦公。' },
+      { id:'desk-2', name:'舊帳單資料夾', keep:15, holdTime:'5年', desc:'三年前的帳單了，早就報完稅，可以數位化後回收。' },
+      { id:'desk-3', name:'桌上小盆栽',   keep:95, holdTime:'1年', desc:'每天看到心情都會變好，捨不得丟，留著。' }
+    ],
+    large_wardrobe: [
+      { id:'large_wardrobe-1', name:'深藍色針織衫', keep:30, holdTime:'4年', desc:'版型有點舊了，但材質很好，猶豫要不要改造。' },
+      { id:'large_wardrobe-2', name:'牛仔外套',     keep:70, holdTime:'6年', desc:'百搭款式，這幾年都還會穿，留下來。' },
+      { id:'large_wardrobe-3', name:'幾乎沒穿過的洋裝', keep:10, holdTime:'2年', desc:'買的時候很心動，掛了兩年吊牌都還在，該放手了。' }
+    ],
+    bed: [
+      { id:'bed-1', name:'舊抱枕', keep:40, holdTime:'2年', desc:'邊角有點磨損，考慮換新的內裡再留。' },
+      { id:'bed-2', name:'備用棉被', keep:60, holdTime:'3年', desc:'換季會用到，收納好留著。' }
+    ],
+    wardrobe: [
+      { id:'wardrobe-1', name:'圍巾與帽子', keep:55, holdTime:'2年', desc:'冬天出門常戴，留下實用款式就好。' },
+      { id:'wardrobe-2', name:'收納用真空袋', keep:65, holdTime:'1年', desc:'換季收納很方便，繼續留著用。' },
+      { id:'wardrobe-3', name:'舊皮帶', keep:25, holdTime:'5年', desc:'扣環有點鬆了，可以考慮換新的。' }
+    ],
+    low_cabinet: [
+      { id:'low_cabinet-1', name:'閒置花盆', keep:25, holdTime:'3年', desc:'裡面的植物已經枯了，盆子可以轉送鄰居。' },
+      { id:'low_cabinet-2', name:'曬衣夾收納袋', keep:70, holdTime:'2年', desc:'還在用，晾衣服的好幫手。' }
+    ],
+    long_cabinet: [
+      { id:'long_cabinet-1', name:'舊電線與充電器', keep:15, holdTime:'6年', desc:'型號對不上任何現有的設備了，可以回收。' },
+      { id:'long_cabinet-2', name:'工具箱', keep:90, holdTime:'4年', desc:'居家修繕常用，留下來。' }
+    ],
+    multi_tier_cabinet: [
+      { id:'multi_tier_cabinet-1', name:'床頭燈', keep:95, holdTime:'2年', desc:'每晚看書都會用到，留下來。' },
+      { id:'multi_tier_cabinet-2', name:'舊眼鏡', keep:20, holdTime:'4年', desc:'度數已經不合了，可以捐贈給需要的機構。' }
+    ]
+  };
+
+  var SWIPE_DECK_SIZE = 12; // demo deck length per zone; wire to a real inventory count later
+  var FILLER_KEEP = [20, 35, 50, 65, 80];
+  var FILLER_HOLD = ['半年', '1年', '2年', '3年', '5年'];
+  var FILLER_DESC = '某年代某某商場特價購買，因為是跟朋友一起挑選，所以意義重大，沒有考慮是不是真的適合自己。';
+
+  function buildSwipeDeck(zoneId){
+    var base = (DEMO_ITEMS[zoneId] || []).map(function(item){ return Object.assign({}, item); });
+    var deck = base.slice();
+    var n = 1;
+    while (deck.length < SWIPE_DECK_SIZE){
+      deck.push({
+        id: zoneId + '-filler-' + n,
+        name: 'A牌衣服 #' + (deck.length + 1),
+        keep: FILLER_KEEP[n % FILLER_KEEP.length],
+        holdTime: FILLER_HOLD[n % FILLER_HOLD.length],
+        desc: FILLER_DESC
+      });
+      n++;
+    }
+    return deck;
+  }
+
+  var renderer, scene, camera, raycaster, mouseVec;
+  var roomInitialized = false;
+  var roomActive = false;
+  var rafId = null;
+  var clock = null;
+
+  var furnitureMeshes = [];
+  var mixers = []; // THREE.AnimationMixer instances for Blender-exported clips (empty until room.glb is wired up)
+  var hovered = null;
+  var controlsPaused = false;
+
+  var player = { x:0, y:1.7, z:5.6, yaw:0, pitch:0 };
+  var keys = {};
+  var isDragging = false;
+  var dragMoved = false;
+  var dragStart = { x:0, y:0, yaw:0, pitch:0 };
+
+  function initRoomScene(){
+    if (roomInitialized) return;
+    roomInitialized = true;
+
+    var canvas = document.getElementById('roomCanvas');
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xbfe0e8);
+    scene.fog = new THREE.Fog(0xbfe0e8, 18, 34);
+
+    camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.rotation.order = 'YXZ';
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x6b5240, 0.9));
+    var sun = new THREE.DirectionalLight(0xfff2da, 0.85);
+    sun.position.set(6, 10, 4);
+    scene.add(sun);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+
+    buildRoom();
+    buildFurniture();
+
+    raycaster = new THREE.Raycaster();
+    mouseVec = new THREE.Vector2();
+
+    clock = new THREE.Clock();
+
+    canvas.addEventListener('mousedown', onCanvasMouseDown);
+    canvas.addEventListener('mousemove', onCanvasMouseMove);
+    window.addEventListener('mouseup', onCanvasMouseUp);
+    canvas.addEventListener('contextmenu', onCanvasContextMenu);
+    window.addEventListener('keydown', onRoomKeyDown);
+    window.addEventListener('keyup', onRoomKeyUp);
+    window.addEventListener('resize', onRoomResize);
+
+    /*
+    // ---------------------------------------------------------------
+    // GLTFLoader placeholder — swap the cube placeholders for room.glb
+    // Uncomment this block once GLTFLoader.js (see the loader script tag
+    // above) and your exported model are both in place.
+    //
+    // Blender export tips for this scene:
+    // - Export as .glb (glTF Binary) with "+Y Up" so it matches Three.js.
+    // - room_shell (walls/floor) is static — no naming requirements
+    //   beyond keeping it out of the furniture hierarchy.
+    // - Each furniture item is one PARENT mesh named per parentName in
+    //   FURNITURE_CONFIG ("Desk", "Large_wardrobe", "Wardrobe",
+    //   "Low_cabinet", "Long_cabinet", "Multi-tier_cabinet", "Bed").
+    //   This file raycasts against the parent (recursively, so its
+    //   child parts count too) — that's the single click/hover hotspot
+    //   for the whole item.
+    // - Each moving part (drawer/door/lid) is a CHILD of that parent,
+    //   named per children[].name ("Desk_drawer_01", "Desk_drawer_02",
+    //   "Large_wardrobe_door_01", ...). If a part is itself built from
+    //   several pieces in Blender, join them (Ctrl+J) into that one
+    //   named child before exporting — one child object per moving part.
+    // - Each child's "open" animation action is named per
+    //   children[].action ("Desk_drawer_01_open", ...) so it can be
+    //   looked up by name instead of guessing from clip order.
+    // ---------------------------------------------------------------
+    // var gltfLoader = new THREE.GLTFLoader();
+    // gltfLoader.load('models/room.glb', function (gltf) {
+    //   scene.add(gltf.scene);
+    //   furnitureGroup.visible = false; // hide the placeholder cubes
+    //
+    //   // Re-point furnitureMeshes at the real named parents, and wire
+    //   // each child's named clip to the same play/reverse calls that
+    //   // setHover() already uses via mesh.userData.actions — no other
+    //   // logic needs to change.
+    //   furnitureMeshes.length = 0;
+    //   mixers.length = 0;
+    //   FURNITURE_CONFIG.forEach(function (cfg) {
+    //     var parentObj = gltf.scene.getObjectByName(cfg.parentName);
+    //     if (!parentObj) return;
+    //     parentObj.userData = {
+    //       id: cfg.id, label: cfg.label,
+    //       outline: parentObj.userData.outline,
+    //       actions: []
+    //     };
+    //     furnitureMeshes.push(parentObj);
+    //
+    //     (cfg.children || []).forEach(function (childCfg) {
+    //       var childObj = gltf.scene.getObjectByName(childCfg.name);
+    //       var clip = THREE.AnimationClip.findByName(gltf.animations, childCfg.action);
+    //       if (!childObj || !clip) return;
+    //       var mixer = new THREE.AnimationMixer(childObj);
+    //       var action = mixer.clipAction(clip);
+    //       action.loop = THREE.LoopOnce;
+    //       action.clampWhenFinished = true;
+    //       parentObj.userData.actions.push(action);
+    //       mixers.push(mixer);
+    //     });
+    //   });
+    // }, undefined, function (error) {
+    //   console.error('room.glb failed to load', error);
+    // });
+    */
+  }
+
+  function buildRoom(){
+    // Static, non-interactive geometry — matches the "room_shell" entry
+    // in the Blender naming spec (no raycasting/animation on this group).
+    var shell = new THREE.Group();
+    shell.name = 'room_shell';
+    scene.add(shell);
+
+    var floorGeo = new THREE.PlaneGeometry(16, 18);
+    var floorMat = new THREE.MeshStandardMaterial({ color: 0x5c3a26, roughness: 0.9 });
+    var floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0, -0.6);
+    shell.add(floor);
+
+    var grid = new THREE.GridHelper(18, 18, 0x2b1a10, 0x2b1a10);
+    grid.position.set(0, 0.01, -0.6);
+    grid.material.opacity = 0.18;
+    grid.material.transparent = true;
+    shell.add(grid);
+
+    var wallMat = new THREE.MeshStandardMaterial({ color: 0xefe7d8, roughness: 1 });
+    var wallH = 5.5;
+
+    var backWall = new THREE.Mesh(new THREE.PlaneGeometry(16, wallH), wallMat);
+    backWall.position.set(0, wallH / 2, -9.6);
+    shell.add(backWall);
+
+    var leftWall = new THREE.Mesh(new THREE.PlaneGeometry(18, wallH), wallMat);
+    leftWall.rotation.y = Math.PI / 2;
+    leftWall.position.set(-8, wallH / 2, -0.6);
+    shell.add(leftWall);
+
+    var rightWall = new THREE.Mesh(new THREE.PlaneGeometry(18, wallH), wallMat);
+    rightWall.rotation.y = -Math.PI / 2;
+    rightWall.position.set(8, wallH / 2, -0.6);
+    shell.add(rightWall);
+
+    // front wall with a doorway gap in the middle
+    var frontLeft = new THREE.Mesh(new THREE.PlaneGeometry(5.4, wallH), wallMat);
+    frontLeft.rotation.y = Math.PI;
+    frontLeft.position.set(-5.3, wallH / 2, 8.4);
+    shell.add(frontLeft);
+
+    var frontRight = new THREE.Mesh(new THREE.PlaneGeometry(5.4, wallH), wallMat);
+    frontRight.rotation.y = Math.PI;
+    frontRight.position.set(5.3, wallH / 2, 8.4);
+    shell.add(frontRight);
+
+    var lintel = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2), wallMat);
+    lintel.rotation.y = Math.PI;
+    lintel.position.set(0, wallH - 1, 8.4);
+    shell.add(lintel);
+  }
+
+  var furnitureGroup;
+  function buildFurniture(){
+    furnitureGroup = new THREE.Group();
+    scene.add(furnitureGroup);
+
+    FURNITURE_CONFIG.forEach(function(cfg){
+      var geo = new THREE.BoxGeometry(cfg.size[0], cfg.size[1], cfg.size[2]);
+      var mat = new THREE.MeshStandardMaterial({
+        color: cfg.color,
+        roughness: 0.6,
+        emissive: 0x000000,
+        emissiveIntensity: 0
+      });
+      var mesh = new THREE.Mesh(geo, mat);
+      mesh.name = cfg.parentName; // matches the Blender naming spec (see chat)
+      mesh.position.set(cfg.pos[0], cfg.pos[1], cfg.pos[2]);
+      mesh.userData = { id: cfg.id, label: cfg.label, baseColor: cfg.color, actions: [] };
+
+      var outlineGeo = new THREE.EdgesGeometry(geo);
+      var outline = new THREE.LineSegments(outlineGeo, new THREE.LineBasicMaterial({ color: 0xfff6e0, linewidth: 2 }));
+      outline.scale.set(1.04, 1.04, 1.04);
+      outline.visible = false;
+      mesh.add(outline);
+      mesh.userData.outline = outline;
+
+      buildFurnitureChildren(mesh, cfg);
+
+      furnitureGroup.add(mesh);
+      furnitureMeshes.push(mesh);
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Build each furniture's animated sub-parts (drawers/doors/lids) as
+  // named children of the parent mesh, each with its own procedural
+  // "open" clip. This is a placeholder: once room.glb ships with real
+  // clips named per child.action (see FURNITURE_CONFIG), swap the body
+  // of this function for AnimationClip.findByName(gltf.animations,
+  // child.action) per child — setHover()/playFurnitureActions() below
+  // don't need to change since they just iterate mesh.userData.actions.
+  // ------------------------------------------------------------------
+  function buildFurnitureChildren(parentMesh, cfg){
+    (cfg.children || []).forEach(function(childCfg){
+      var geo = new THREE.BoxGeometry(childCfg.size[0], childCfg.size[1], childCfg.size[2]);
+      var mat = new THREE.MeshStandardMaterial({ color: cfg.color, roughness: 0.5, metalness: 0.05 });
+      var child = new THREE.Mesh(geo, mat);
+      child.name = childCfg.name; // matches the Blender naming spec (see chat)
+      child.position.set(childCfg.local[0], childCfg.local[1], childCfg.local[2]);
+      parentMesh.add(child);
+
+      var duration = 0.55;
+      var startPos = child.position.toArray();
+      var startRot = [child.rotation.x, child.rotation.y, child.rotation.z];
+      var track;
+
+      if (childCfg.type === 'slideX'){
+        var endPosX = [startPos[0] + (childCfg.dir || 1) * 0.34, startPos[1], startPos[2]];
+        track = new THREE.VectorKeyframeTrack('.position', [0, duration], startPos.concat(endPosX));
+      } else if (childCfg.type === 'lidRotate'){
+        var endRot = [startRot[0] - 0.9, startRot[1], startRot[2]]; // hinge open ~50°
+        var q0 = new THREE.Quaternion().setFromEuler(new THREE.Euler(startRot[0], startRot[1], startRot[2]));
+        var q1 = new THREE.Quaternion().setFromEuler(new THREE.Euler(endRot[0], endRot[1], endRot[2]));
+        track = new THREE.QuaternionKeyframeTrack('.quaternion', [0, duration], [q0.x,q0.y,q0.z,q0.w, q1.x,q1.y,q1.z,q1.w]);
+      } else { // 'slideZ' default — drawer pulling toward the player
+        var endPosZ = [startPos[0], startPos[1], startPos[2] + 0.34];
+        track = new THREE.VectorKeyframeTrack('.position', [0, duration], startPos.concat(endPosZ));
+      }
+
+      var clip = new THREE.AnimationClip(childCfg.action, duration, [track]);
+      var mixer = new THREE.AnimationMixer(child);
+      var action = mixer.clipAction(clip);
+      action.loop = THREE.LoopOnce;
+      action.clampWhenFinished = true;
+
+      mixers.push(mixer);
+      parentMesh.userData.actions.push(action);
+    });
+  }
+
+  function playFurnitureActions(mesh, direction){
+    var actions = mesh && mesh.userData && mesh.userData.actions;
+    if (!actions || !actions.length) return;
+    actions.forEach(function(action){
+      action.paused = false;
+      action.timeScale = direction;
+      action.play();
+    });
+  }
+
+  function resetCamera(){
+    player.x = 0; player.y = 1.7; player.z = 5.6; player.yaw = 0; player.pitch = 0;
+    camera.position.set(player.x, player.y, player.z);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  }
+
+  function setHover(mesh){
+    if (hovered === mesh) return;
+    if (hovered){
+      hovered.userData.outline.visible = false;
+      hovered.material.emissiveIntensity = 0;
+      playFurnitureActions(hovered, -1); // reverse / close every child part
+    }
+    hovered = mesh;
+    if (hovered){
+      hovered.userData.outline.visible = true;
+      hovered.material.emissive.setHex(0xfff2c9);
+      hovered.material.emissiveIntensity = 0.55;
+      playFurnitureActions(hovered, 1); // play forward / open every child part
+    }
+  }
+
+  function updateMouseVec(clientX, clientY){
+    var rect = renderer.domElement.getBoundingClientRect();
+    mouseVec.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouseVec.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  // Recursive raycasts can return a child (drawer/door) instead of the
+  // parent furniture mesh — walk up to the parent that's registered in
+  // furnitureMeshes so hover/click always resolve to the whole item.
+  function resolveFurnitureRoot(obj){
+    while (obj){
+      if (furnitureMeshes.indexOf(obj) !== -1) return obj;
+      obj = obj.parent;
+    }
+    return null;
+  }
+
+  function pickFurniture(){
+    raycaster.setFromCamera(mouseVec, camera);
+    var hits = raycaster.intersectObjects(furnitureMeshes, true);
+    if (!hits.length) return null;
+    return resolveFurnitureRoot(hits[0].object);
+  }
+
+  function onCanvasMouseDown(e){
+    if (!roomActive || controlsPaused) return;
+    if (e.button !== 0) return;
+    isDragging = true;
+    dragMoved = false;
+    dragStart.x = e.clientX;
+    dragStart.y = e.clientY;
+    dragStart.yaw = player.yaw;
+    dragStart.pitch = player.pitch;
+    renderer.domElement.classList.add('dragging');
+  }
+
+  function onCanvasMouseMove(e){
+    if (!roomActive) return;
+    updateMouseVec(e.clientX, e.clientY);
+
+    if (isDragging && !controlsPaused){
+      var dx = e.clientX - dragStart.x;
+      var dy = e.clientY - dragStart.y;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMoved = true;
+      player.yaw = dragStart.yaw - dx * 0.0028;
+      player.pitch = Math.max(-1.2, Math.min(1.2, dragStart.pitch - dy * 0.0028));
+    }
+  }
+
+  function onCanvasMouseUp(e){
+    if (!roomActive) return;
+    if (e.button === 0 && isDragging){
+      isDragging = false;
+      renderer.domElement.classList.remove('dragging');
+      if (!dragMoved && !controlsPaused){
+        var hit = pickFurniture();
+        if (hit) openFurnitureModal(hit);
+      }
+    }
+  }
+
+  function onCanvasContextMenu(e){
+    e.preventDefault();
+    if (!roomActive) return;
+    if (furnitureModalOverlay.classList.contains('active')){
+      closeFurnitureModal();
+    }
+  }
+
+  function onRoomKeyDown(e){
+    if (!roomActive) return;
+    keys[e.code] = true;
+  }
+  function onRoomKeyUp(e){
+    keys[e.code] = false;
+  }
+
+  function onRoomResize(){
+    if (!renderer || !camera) return;
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  function updateMovement(dt){
+    if (controlsPaused) return;
+    var forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    var right = new THREE.Vector3(-forward.z, 0, forward.x);
+    var speed = 4.4 * dt;
+    var move = new THREE.Vector3();
+
+    if (keys['KeyW']) move.add(forward);
+    if (keys['KeyS']) move.sub(forward);
+    if (keys['KeyD']) move.add(right);
+    if (keys['KeyA']) move.sub(right);
+
+    if (move.lengthSq() > 0){
+      move.normalize().multiplyScalar(speed);
+      player.x += move.x;
+      player.z += move.z;
+      player.x = Math.max(ROOM_BOUNDS.minX, Math.min(ROOM_BOUNDS.maxX, player.x));
+      player.z = Math.max(ROOM_BOUNDS.minZ, Math.min(ROOM_BOUNDS.maxZ, player.z));
+    }
+
+    camera.position.set(player.x, player.y, player.z);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  }
+
+  function drawMinimap(){
+    var canvas = document.getElementById('minimapCanvas');
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    function toMap(x, z){
+      var mx = ((x - ROOM_BOUNDS.minX) / (ROOM_BOUNDS.maxX - ROOM_BOUNDS.minX)) * w;
+      var mz = h - ((z - ROOM_BOUNDS.minZ) / (ROOM_BOUNDS.maxZ - ROOM_BOUNDS.minZ)) * h;
+      return [mx, mz];
+    }
+
+    // room outline
+    ctx.strokeStyle = 'rgba(43,35,28,0.35)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, w - 4, h - 4);
+
+    // furniture
+    FURNITURE_CONFIG.forEach(function(cfg){
+      var p = toMap(cfg.pos[0], cfg.pos[2]);
+      var fw = Math.max(6, (cfg.size[0] / 16) * w);
+      var fh = Math.max(6, (cfg.size[2] / 18) * h);
+      ctx.fillStyle = '#' + cfg.color.toString(16).padStart(6, '0');
+      ctx.fillRect(p[0] - fw / 2, p[1] - fh / 2, fw, fh);
+    });
+
+    // player
+    var pp = toMap(player.x, player.z);
+    ctx.save();
+    ctx.translate(pp[0], pp[1]);
+    ctx.rotate(player.yaw);
+    ctx.fillStyle = '#c14f36';
+    ctx.beginPath();
+    ctx.moveTo(0, -9);
+    ctx.lineTo(6, 7);
+    ctx.lineTo(-6, 7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function animateRoom(){
+    if (!roomActive) return;
+    rafId = requestAnimationFrame(animateRoom);
+
+    var dt = clock ? Math.min(clock.getDelta(), 0.05) : 0.016;
+    updateMovement(dt);
+    mixers.forEach(function(mixer){ mixer.update(dt); });
+
+    if (!isDragging && !controlsPaused){
+      var hit = pickFurniture();
+      setHover(hit);
+      renderer.domElement.classList.toggle('hovering', !!hit);
+    }
+
+    drawMinimap();
+    renderer.render(scene, camera);
+  }
+
+  function enterRoomScene(){
+    initRoomScene();
+    onRoomResize();
+    resetCamera();
+    setHover(null);
+    document.getElementById('roomScene').classList.add('active');
+    roomActive = true;
+    if (clock) clock.start();
+    cancelAnimationFrame(rafId);
+    animateRoom();
+  }
+
+  function leaveRoomScene(){
+    roomActive = false;
+    cancelAnimationFrame(rafId);
+    document.getElementById('roomScene').classList.remove('active');
+    keys = {};
+    isDragging = false;
+    controlsPaused = false;
+    closeFurnitureModal();
+    closeStatsModal();
+  }
+
+  /* ---------------- Zone progress panel (left side, under minimap) ---------------- */
+  var zoneProgressListEl = document.getElementById('zoneProgressList');
+
+  function statusForProgress(p){
+    if (p >= 100) return { cls:'done', text:'已整理 100%' };
+    if (p > 0) return { cls:'partial', text:'整理中 ' + p + '%' };
+    return { cls:'pending', text:'尚未整理' };
+  }
+
+  function buildZoneProgressUI(){
+    zoneProgressListEl.innerHTML = '';
+    FURNITURE_CONFIG.forEach(function(cfg){
+      var hex = '#' + cfg.color.toString(16).padStart(6, '0');
+      var st = statusForProgress(furnitureState[cfg.id].progress);
+      var li = document.createElement('li');
+      li.id = 'zone-' + cfg.id;
+      li.innerHTML =
+        '<span class="zname"><span class="zdot" style="background:' + hex + '"></span>' + cfg.label + '</span>' +
+        '<span class="zstatus ' + st.cls + '">' + st.text + '</span>';
+      zoneProgressListEl.appendChild(li);
+    });
+  }
+
+  function refreshZoneRow(id){
+    var li = document.getElementById('zone-' + id);
+    if (!li) return;
+    var st = statusForProgress(furnitureState[id].progress);
+    var badge = li.querySelector('.zstatus');
+    badge.className = 'zstatus ' + st.cls;
+    badge.textContent = st.text;
+  }
+
+  /* ---------------- Furniture interaction modal ---------------- */
+  var furnitureModalOverlay = document.getElementById('furnitureModalOverlay');
+  var furnitureModalTitle = document.getElementById('furnitureModalTitle');
+  var furnitureModalDesc = document.getElementById('furnitureModalDesc');
+  var furnitureCancelBtn = document.getElementById('furnitureCancelBtn');
+  var furnitureConfirmBtn = document.getElementById('furnitureConfirmBtn');
+  var activeFurniture = null;
+
+  function openFurnitureModal(mesh){
+    activeFurniture = mesh;
+    var itemCount = buildSwipeDeck(mesh.userData.id).length;
+    furnitureModalTitle.textContent = '是否開始整理' + mesh.userData.label + '？';
+    furnitureModalDesc.textContent = '你將有 ' + itemCount + ' 件物品需要篩選';
+    furnitureModalOverlay.classList.add('active');
+    controlsPaused = true; // hover stays locked "open" (see animateRoom) until this closes
+  }
+  function closeFurnitureModal(){
+    furnitureModalOverlay.classList.remove('active');
+    controlsPaused = false;
+    activeFurniture = null;
+    setHover(null); // plays the reverse/close animation on whatever was open
+  }
+  furnitureCancelBtn.addEventListener('click', closeFurnitureModal);
+  furnitureConfirmBtn.addEventListener('click', function(){
+    var mesh = activeFurniture;
+    closeFurnitureModal();
+    if (mesh) openSwipeSession(mesh.userData.id);
+  });
+  furnitureModalOverlay.addEventListener('click', function(e){
+    if (e.target === furnitureModalOverlay) closeFurnitureModal();
+  });
+
+  /* ---------------- Item stats modal (物品清單: tabs + list) ---------------- */
+  var statsModalOverlay = document.getElementById('statsModalOverlay');
+  var statsIcon = document.getElementById('statsIcon');
+  var statsCloseBtn = document.getElementById('statsCloseBtn');
+  var statsTabsEl = document.getElementById('statsTabs');
+  var furnitureListEl = document.getElementById('furnitureList');
+  var activeTabId = FURNITURE_CONFIG[0].id;
+
+  function buildStatsTabs(){
+    statsTabsEl.innerHTML = '';
+    FURNITURE_CONFIG.forEach(function(cfg){
+      var hex = '#' + cfg.color.toString(16).padStart(6, '0');
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'stats-tab' + (cfg.id === activeTabId ? ' active' : '');
+      btn.style.background = hex;
+      btn.textContent = cfg.label;
+      btn.addEventListener('click', function(){
+        activeTabId = cfg.id;
+        buildStatsTabs();
+        buildStatsItemList();
+      });
+      statsTabsEl.appendChild(btn);
+    });
+  }
+
+  var eyeIconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+  function buildStatsItemList(){
+    furnitureListEl.innerHTML = '';
+    var items = DEMO_ITEMS[activeTabId] || [];
+    items.forEach(function(item){
+      var discard = 100 - item.keep;
+      var li = document.createElement('li');
+      li.innerHTML =
+        '<span class="item-name">' + item.name + '</span>' +
+        '<span class="item-keep">留 ' + item.keep + '%</span>' +
+        '<div class="item-bar"><div class="bar-keep" style="width:' + item.keep + '%"></div><div class="bar-discard" style="width:' + discard + '%"></div></div>' +
+        '<span class="item-discard">' + discard + '% 丟</span>' +
+        '<button class="item-eye" type="button" aria-label="預覽 ' + item.name + '">' + eyeIconSvg + '</button>';
+      li.querySelector('.item-name').addEventListener('click', function(){ openItemDetail(item); });
+      li.querySelector('.item-eye').addEventListener('click', function(){ openItemDetail(item); });
+      furnitureListEl.appendChild(li);
+    });
+  }
+
+  function openStatsModal(){
+    activeTabId = FURNITURE_CONFIG[0].id;
+    buildStatsTabs();
+    buildStatsItemList();
+    statsModalOverlay.classList.add('active');
+    controlsPaused = true;
+  }
+  function closeStatsModal(){
+    statsModalOverlay.classList.remove('active');
+    closeItemDetailModal();
+    var stillBlocked = furnitureModalOverlay.classList.contains('active') ||
+      (swipeScene && swipeScene.classList.contains('active'));
+    if (!stillBlocked) controlsPaused = false;
+  }
+  statsIcon.addEventListener('click', openStatsModal);
+  statsCloseBtn.addEventListener('click', closeStatsModal);
+  statsModalOverlay.addEventListener('click', function(e){
+    if (e.target === statsModalOverlay) closeStatsModal();
+  });
+
+  /* ---------------- Item detail modal (物品詳細檢視) ---------------- */
+  var itemDetailModalOverlay = document.getElementById('itemDetailModalOverlay');
+  var itemDetailCloseBtn = document.getElementById('itemDetailCloseBtn');
+  var detailBackBtn = document.getElementById('detailBackBtn');
+  var detailImageEl = document.getElementById('detailImage');
+  var detailNameEl = document.getElementById('detailName');
+  var detailKeepEl = document.getElementById('detailKeep');
+  var detailDiscardEl = document.getElementById('detailDiscard');
+  var detailDescEl = document.getElementById('detailDesc');
+
+  function openItemDetail(item){
+    var cfg = FURNITURE_CONFIG.find(function(c){ return c.id === activeTabId; });
+    var hex = cfg ? '#' + cfg.color.toString(16).padStart(6, '0') : '#cccccc';
+    detailImageEl.style.background = hex;
+    detailImageEl.innerHTML = eyeIconSvg.replace('stroke-width="2"', 'stroke-width="1.4"');
+    detailNameEl.textContent = item.name;
+    detailKeepEl.textContent = '留 ' + item.keep + '%';
+    detailDiscardEl.textContent = (100 - item.keep) + '% 丟';
+    detailDescEl.textContent = item.desc;
+    itemDetailModalOverlay.classList.add('active');
+  }
+  function closeItemDetailModal(){
+    itemDetailModalOverlay.classList.remove('active');
+  }
+  itemDetailCloseBtn.addEventListener('click', closeItemDetailModal);
+  detailBackBtn.addEventListener('click', closeItemDetailModal);
+  itemDetailModalOverlay.addEventListener('click', function(e){
+    if (e.target === itemDetailModalOverlay) closeItemDetailModal();
+  });
+
+  /* ---------------- Reusable confirm dialog ---------------- */
+  var confirmDialogOverlay = document.getElementById('confirmDialogOverlay');
+  var confirmDialogTitleEl = document.getElementById('confirmDialogTitle');
+  var confirmDialogDescEl = document.getElementById('confirmDialogDesc');
+  var confirmDialogCancelBtn = document.getElementById('confirmDialogCancelBtn');
+  var confirmDialogConfirmBtn = document.getElementById('confirmDialogConfirmBtn');
+  var confirmDialogResolve = null;
+
+  function openConfirmDialog(opts){
+    confirmDialogTitleEl.textContent = opts.title || '確定嗎？';
+    confirmDialogDescEl.textContent = opts.desc || '';
+    confirmDialogConfirmBtn.textContent = opts.confirmText || '確定';
+    confirmDialogCancelBtn.textContent = opts.cancelText || '取消';
+    confirmDialogResolve = opts.onConfirm || null;
+    confirmDialogOverlay.classList.add('active');
+  }
+  function closeConfirmDialog(){
+    confirmDialogOverlay.classList.remove('active');
+    confirmDialogResolve = null;
+  }
+  confirmDialogCancelBtn.addEventListener('click', closeConfirmDialog);
+  confirmDialogConfirmBtn.addEventListener('click', function(){
+    var cb = confirmDialogResolve;
+    closeConfirmDialog();
+    if (cb) cb();
+  });
+  confirmDialogOverlay.addEventListener('click', function(e){
+    if (e.target === confirmDialogOverlay) closeConfirmDialog();
+  });
+
+  /* ================================================================
+     Swipe (斷捨離) session — Tinder-style card sorting for one zone
+     ================================================================ */
+  var swipeScene = document.getElementById('swipeScene');
+  var swipeZoneNameEl = document.getElementById('swipeZoneName');
+  var swipeProgressFillEl = document.getElementById('swipeProgressFill');
+  var swipeCurrentEl = document.getElementById('swipeCurrent');
+  var swipeTotalEl = document.getElementById('swipeTotal');
+  var swipeCardStackEl = document.getElementById('swipeCardStack');
+  var swipeCloseBtn = document.getElementById('swipeCloseBtn');
+  var swipeKeepBtn = document.getElementById('swipeKeepBtn');
+  var swipeUndoBtn = document.getElementById('swipeUndoBtn');
+  var swipeDiscardBtn = document.getElementById('swipeDiscardBtn');
+  var swipeHomeIcon = document.getElementById('swipeHomeIcon');
+  var swipeStatsIcon = document.getElementById('swipeStatsIcon');
+  var swipeChatIcon = document.getElementById('swipeChatIcon');
+
+  var swipeState = null; // { zoneId, deck, index, history:[{item,direction}] }
+  var cardIconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l4.5-6 3.5 4.5 2.5-3L20 16"/><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>';
+  var SLOT_COUNT = 5; // 1 interactive front card + 4 real-content cards stacked behind it
+  var slotEls = []; // persistent DOM nodes, reused/reordered rather than rebuilt each swipe
+
+  function openSwipeSession(zoneId){
+    var cfg = FURNITURE_CONFIG.find(function(c){ return c.id === zoneId; });
+    if (!cfg) return;
+    swipeState = { zoneId: zoneId, deck: buildSwipeDeck(zoneId), index: 0, history: [] };
+    swipeZoneNameEl.textContent = cfg.label;
+    controlsPaused = true; // pause WASD + mouse-look while swiping
+    swipeScene.classList.add('active');
+    initSwipeSlots();
+    updateSwipeProgress();
+  }
+
+  function closeSwipeSession(){
+    swipeScene.classList.remove('active');
+    swipeCardStackEl.innerHTML = '';
+    slotEls = [];
+    controlsPaused = false;
+    swipeState = null;
+  }
+
+  function updateSwipeProgress(){
+    if (!swipeState) return;
+    var total = swipeState.deck.length;
+    var done = swipeState.history.length;
+    swipeCurrentEl.textContent = Math.min(done + 1, total);
+    swipeTotalEl.textContent = total;
+    swipeProgressFillEl.style.width = (done / total * 100) + '%';
+  }
+
+  function cardHex(zoneId){
+    var cfg = FURNITURE_CONFIG.find(function(c){ return c.id === zoneId; });
+    return cfg ? '#' + cfg.color.toString(16).padStart(6, '0') : '#cccccc';
+  }
+
+  // Build the fixed pool of card elements once per session. Each one stays
+  // in the DOM for the whole session — swiping only changes which "slot"
+  // class (and therefore scale/offset/z-index) an element wears and, for
+  // the one being recycled from front to back, its content. Because the
+  // real image/name is always rendered (never a gray placeholder), the
+  // next card is fully visible and legible the moment the current one
+  // starts moving away.
+  function initSwipeSlots(){
+    swipeCardStackEl.innerHTML = '';
+    slotEls = [];
+    for (var i = 0; i < SLOT_COUNT; i++){
+      var card = document.createElement('div');
+      card.className = 'swipe-card no-anim';
+      card.innerHTML =
+        '<div class="swipe-card-image"></div>' +
+        '<div class="swipe-card-body">' +
+          '<div class="swipe-card-header"><h3></h3><span class="hold-tag"></span></div>' +
+          '<p class="swipe-card-desc"></p>' +
+        '</div>' +
+        '<div class="swipe-card-overlay keep-overlay">留下</div>' +
+        '<div class="swipe-card-overlay discard-overlay">丟掉</div>';
+      attachSwipeDrag(card);
+      swipeCardStackEl.appendChild(card);
+      slotEls.push(card);
+    }
+    applySlotPositions();
+    // let the initial layout apply instantly, then re-enable transitions
+    void swipeCardStackEl.offsetWidth;
+    requestAnimationFrame(function(){
+      slotEls.forEach(function(el){ el.classList.remove('no-anim'); });
+    });
+  }
+
+  function fillCardContent(el, item, hex){
+    el.querySelector('.swipe-card-image').style.background = hex;
+    el.querySelector('.swipe-card-image').innerHTML = cardIconSvg;
+    el.querySelector('.swipe-card-header h3').textContent = item.name;
+    el.querySelector('.hold-tag').textContent = item.holdTime;
+    el.querySelector('.swipe-card-desc').textContent = item.desc;
+  }
+
+  // Applies slotEls[i] → visual position i (front = 0). Only content for
+  // elements whose underlying deck item actually changed gets rewritten;
+  // everything else just gets a new position class, which is what the
+  // CSS transition animates (the "promote to front" grow/rise effect).
+  function applySlotPositions(){
+    if (!swipeState) return;
+    var deck = swipeState.deck;
+    var hex = cardHex(swipeState.zoneId);
+    slotEls.forEach(function(el, i){
+      el.classList.remove('swipe-slot-0','swipe-slot-1','swipe-slot-2','swipe-slot-3','swipe-slot-4','swipe-slot-hidden');
+      var idx = swipeState.index + i;
+      if (idx < deck.length){
+        fillCardContent(el, deck[idx], hex);
+        el.classList.add('swipe-slot-' + i);
+        el.dataset.slot = String(i);
+      } else {
+        el.classList.add('swipe-slot-hidden');
+        el.dataset.slot = 'hidden';
+      }
+    });
+  }
+
+  function attachSwipeDrag(card){
+    var startX = 0, startY = 0, dx = 0, isDown = false;
+    var keepOverlay = card.querySelector('.keep-overlay');
+    var discardOverlay = card.querySelector('.discard-overlay');
+    var THRESHOLD = 110;
+
+    function onDown(e){
+      if (card.dataset.slot !== '0') return; // only the front card responds
+      isDown = true; dx = 0;
+      startX = e.clientX; startY = e.clientY;
+      card.classList.add('dragging');
+      if (card.setPointerCapture && e.pointerId != null) card.setPointerCapture(e.pointerId);
+    }
+    function onMove(e){
+      if (!isDown) return;
+      dx = e.clientX - startX;
+      var dy = e.clientY - startY;
+      var rot = Math.max(-18, Math.min(18, dx * 0.06));
+      card.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + rot + 'deg)';
+      var ratio = Math.min(1, Math.abs(dx) / THRESHOLD);
+      if (dx < 0){ keepOverlay.style.opacity = ratio; discardOverlay.style.opacity = 0; }
+      else { discardOverlay.style.opacity = ratio; keepOverlay.style.opacity = 0; }
+    }
+    function onUp(){
+      if (!isDown) return;
+      isDown = false;
+      card.classList.remove('dragging');
+      if (Math.abs(dx) > THRESHOLD){
+        commitSwipe(dx < 0 ? 'keep' : 'discard');
+      } else {
+        card.style.transform = '';
+        keepOverlay.style.opacity = 0;
+        discardOverlay.style.opacity = 0;
+      }
+    }
+
+    card.addEventListener('pointerdown', onDown);
+    card.addEventListener('pointermove', onMove);
+    card.addEventListener('pointerup', onUp);
+    card.addEventListener('pointercancel', onUp);
+  }
+
+  function commitSwipe(direction){
+    if (!swipeState || !slotEls.length) return;
+    var deck = swipeState.deck;
+    var item = deck[swipeState.index];
+    if (!item) return;
+
+    var flownEl = slotEls[0];
+    var flyX = direction === 'keep' ? -window.innerWidth : window.innerWidth;
+    flownEl.classList.add('fly-out');
+    flownEl.style.transform = 'translate(' + flyX + 'px, 40px) rotate(' + (direction === 'keep' ? -24 : 24) + 'deg)';
+
+    // the rest of the stack promotes forward immediately — real content is
+    // already on those cards, so this alone gives the "next card grows
+    // into place" transition while the front card is still flying off.
+    slotEls.shift();
+    slotEls.push(flownEl);
+    swipeState.history.push({ item: item, direction: direction });
+    swipeState.index++;
+    updateSwipeProgress();
+    applySlotPositions();
+
+    setTimeout(function(){
+      if (!swipeState) return;
+      // recycle the flown-out card into the new back slot without it
+      // visibly flying back in — snap it into place, then re-enable
+      // transitions on the next frame.
+      flownEl.classList.add('no-anim');
+      flownEl.classList.remove('fly-out');
+      flownEl.style.transform = '';
+      applySlotPositions(); // refresh in case index moved again (e.g. fast swipes)
+      void flownEl.offsetWidth;
+      requestAnimationFrame(function(){ flownEl.classList.remove('no-anim'); });
+
+      if (swipeState.index >= deck.length) showSwipeSummary();
+    }, 400);
+  }
+
+  function triggerButtonSwipe(direction){
+    if (!swipeState || swipeState.index >= swipeState.deck.length) return;
+    commitSwipe(direction);
+  }
+
+  function undoSwipe(){
+    if (!swipeState || !swipeState.history.length) return;
+    swipeState.history.pop();
+    swipeState.index--;
+    updateSwipeProgress();
+    applySlotPositions();
+  }
+
+  swipeKeepBtn.addEventListener('click', function(){ triggerButtonSwipe('keep'); });
+  swipeDiscardBtn.addEventListener('click', function(){ triggerButtonSwipe('discard'); });
+  swipeUndoBtn.addEventListener('click', undoSwipe);
+
+  swipeCloseBtn.addEventListener('click', function(){
+    openConfirmDialog({
+      title:'要離開整理模式嗎？',
+      desc:'目前已篩選的卡片會保留，之後可以繼續整理這一區。',
+      confirmText:'離開',
+      cancelText:'繼續整理',
+      onConfirm: function(){ closeSwipeSession(); }
+    });
+  });
+
+  swipeHomeIcon.addEventListener('click', function(e){
+    var x = e.clientX, y = e.clientY;
+    openConfirmDialog({
+      title:'確定要回到主頁嗎？',
+      desc:'目前的篩選進度將會儲存。',
+      confirmText:'回到主頁',
+      cancelText:'取消',
+      onConfirm: function(){
+        closeSwipeSession();
+        handleGoHome({ clientX: x, clientY: y });
+      }
+    });
+  });
+
+  swipeStatsIcon.addEventListener('click', openStatsModal);
+  swipeChatIcon.addEventListener('click', function(){
+    showToast('留言區即將推出，敬請期待 💬');
+  });
+
+  /* ---------------- Zone completion summary ---------------- */
+  var summaryModalOverlay = document.getElementById('summaryModalOverlay');
+  var summaryEmojiEl = document.getElementById('summaryEmoji');
+  var summaryTitleEl = document.getElementById('summaryTitle');
+  var summaryDescEl = document.getElementById('summaryDesc');
+  var summaryKeepCountEl = document.getElementById('summaryKeepCount');
+  var summaryDiscardCountEl = document.getElementById('summaryDiscardCount');
+  var summaryRetryBtn = document.getElementById('summaryRetryBtn');
+  var summaryDoneBtn = document.getElementById('summaryDoneBtn');
+
+  function showSwipeSummary(){
+    if (!swipeState) return;
+    var history = swipeState.history;
+    var total = history.length;
+    var keepCount = history.filter(function(h){ return h.direction === 'keep'; }).length;
+    var discardCount = total - keepCount;
+    var discardRatio = total ? discardCount / total : 0;
+    var keepRatio = total ? keepCount / total : 0;
+
+    var emoji, title, desc;
+    if (discardRatio > 0.7){
+      emoji = '🧹'; title = '斷捨離大師！';
+      desc = '你狠下心丟掉了大部分物品，空間馬上清爽起來。';
+    } else if (keepRatio > 0.7){
+      emoji = '💛'; title = '念舊收藏家';
+      desc = '每件東西都有它的故事，這次你選擇多多保留回憶。';
+    } else {
+      emoji = '⚖️'; title = '剛剛好的平衡感';
+      desc = '留與丟拿捏得恰到好處，是很成熟的整理風格。';
+    }
+
+    summaryEmojiEl.textContent = emoji;
+    summaryTitleEl.textContent = title;
+    summaryDescEl.textContent = desc;
+    summaryKeepCountEl.textContent = keepCount;
+    summaryDiscardCountEl.textContent = discardCount;
+    summaryModalOverlay.classList.add('active');
+  }
+  function closeSwipeSummary(){
+    summaryModalOverlay.classList.remove('active');
+  }
+  summaryRetryBtn.addEventListener('click', function(){
+    if (!swipeState) return;
+    var zoneId = swipeState.zoneId;
+    closeSwipeSummary();
+    openSwipeSession(zoneId);
+  });
+  summaryDoneBtn.addEventListener('click', function(){
+    if (!swipeState) return;
+    var zoneId = swipeState.zoneId;
+    var cfg = FURNITURE_CONFIG.find(function(c){ return c.id === zoneId; });
+    furnitureState[zoneId].progress = 100;
+    refreshZoneRow(zoneId);
+    closeSwipeSummary();
+    closeSwipeSession();
+    showToast('『' + (cfg ? cfg.label : '') + '』整理完成，已標記為已整理 100% ✅');
+  });
+  summaryModalOverlay.addEventListener('click', function(e){
+    if (e.target === summaryModalOverlay) closeSwipeSummary();
+  });
+
+  /* ---------------- Message board icon (room scene) ---------------- */
+  document.getElementById('chatIcon').addEventListener('click', function(){
+    showToast('留言區即將推出，敬請期待 💬');
+  });
+
+  /* ---------------- Home icon (leave room) ---------------- */
+  function handleGoHome(e){
+    if (isTransitioning) return;
+    var x = (e && e.clientX) || window.innerWidth / 2;
+    var y = (e && e.clientY) || window.innerHeight / 2;
+    playExit(x, y);
+  }
+  function confirmGoHome(e){
+    var x = e.clientX, y = e.clientY;
+    openConfirmDialog({
+      title:'確定要回到主頁嗎？',
+      desc:'目前的進度將會自動儲存。',
+      confirmText:'確定',
+      cancelText:'取消',
+      onConfirm: function(){ handleGoHome({ clientX: x, clientY: y }); }
+    });
+  }
+  document.getElementById('homeIcon').addEventListener('click', confirmGoHome);
+
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape') return;
+    if (confirmDialogOverlay.classList.contains('active')){ closeConfirmDialog(); return; }
+    if (summaryModalOverlay.classList.contains('active')){ closeSwipeSummary(); return; }
+    if (swipeScene.classList.contains('active')){ swipeCloseBtn.click(); return; }
+    if (!roomActive) return;
+    if (itemDetailModalOverlay.classList.contains('active')) closeItemDetailModal();
+    else if (furnitureModalOverlay.classList.contains('active')) closeFurnitureModal();
+    else if (statsModalOverlay.classList.contains('active')) closeStatsModal();
+  });
+
+  buildZoneProgressUI();
+
+})();
+</script>
+</body>
+</html>
