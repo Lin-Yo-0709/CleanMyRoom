@@ -242,12 +242,22 @@
   .door-wrap:hover .door{ transform: rotateY(-4deg) translateX(1px); }
 
   .door-frame::after{
+    /* This is the dark "interior" revealed behind the door as it swings
+       open — not an image. It used to sit behind via z-index:-1, but
+       z-index inside a preserve-3d context (see .door-frame above)
+       doesn't reliably order against a SIBLING that's simultaneously
+       being transformed (the door rotating on hover) — different
+       browsers/GPUs can momentarily composite it in front instead,
+       which is the black flash. Real 3D depth (translateZ) is the
+       correct fix: it's unambiguous regardless of hover/transition state. */
     content:"";
     position:absolute;
     inset:10px;
     border-radius:6px;
     background: radial-gradient(ellipse at 30% 50%, #150c07 0%, #000 90%);
-    z-index:-1;
+    transform: translateZ(-40px);
+    opacity: 0.96;
+    transition: opacity .3s ease;
   }
 
   .door.is-open{
@@ -689,6 +699,7 @@
     top:16px; right:16px;
     display:none;
     flex-direction:column;
+    align-items:center;
     gap:12px;
     z-index:150; /* above room (50) and swipe (120), below modals (300) */
   }
@@ -713,16 +724,14 @@
 
   /* -------- Audio panel (BGM/SFX volume + mute) -------- */
   .audio-panel{
+    position:relative; /* anchor for the absolutely-positioned slider below */
     display:flex;
     align-items:center;
-    gap:8px;
   }
-  .audio-panel-room{ justify-content:flex-end; }
   #landingAudioPanel{
     position:fixed;
     top:24px; right:24px;
     z-index:70;
-    justify-content:flex-end;
   }
   .audio-toggle-btn{
     flex-shrink:0;
@@ -745,23 +754,39 @@
   .audio-toggle-btn.muted .icon-note{ display:none; }
   .audio-toggle-btn.muted .icon-muted{ display:block; }
 
-  /* hidden by default ("可調式旋鈕，平時不出現") — revealed on toggle click */
+  /* Hidden by default ("可調式旋鈕，平時不出現") — revealed on toggle click.
+     Absolutely positioned and anchored to .audio-panel (not a flex
+     sibling of the toggle button), so expanding it changes nothing about
+     .audio-panel's own box size — it can never push/shift the other
+     icons in .global-hud-right, no matter how the column is laid out. */
   .audio-slider-wrap{
+    position:absolute;
+    top:50%;
+    right:calc(100% + 10px);
+    transform: translateY(-50%);
+    display:flex;
+    align-items:center;
     width:0;
     overflow:hidden;
     opacity:0;
+    pointer-events:none;
+    background: var(--paper);
+    border-radius:999px;
+    box-shadow: var(--shadow);
     transition: width .22s ease, opacity .18s ease;
+    white-space:nowrap;
   }
   .audio-slider-wrap.expanded{
-    width:110px;
+    width:126px;
     opacity:1;
+    pointer-events:auto;
+    padding: 0 10px;
   }
   .audio-slider{
     -webkit-appearance:none;
     appearance:none;
-    width:100px;
+    width:106px;
     height:4px;
-    margin:0 6px;
     border-radius:999px;
     background: rgba(43,35,28,0.18);
     outline:none;
@@ -770,7 +795,7 @@
     -webkit-appearance:none;
     width:16px; height:16px;
     border-radius:50%;
-    background: var(--paper);
+    background: var(--coral-deep);
     box-shadow: 0 2px 5px rgba(0,0,0,0.35);
     cursor:pointer;
   }
@@ -778,7 +803,7 @@
     width:16px; height:16px;
     border:none;
     border-radius:50%;
-    background: var(--paper);
+    background: var(--coral-deep);
     box-shadow: 0 2px 5px rgba(0,0,0,0.35);
     cursor:pointer;
   }
@@ -787,8 +812,8 @@
     #landingAudioPanel{ top:16px; right:16px; }
     .audio-toggle-btn{ width:38px; height:38px; }
     .audio-toggle-btn svg{ width:16px; height:16px; }
-    .audio-slider-wrap.expanded{ width:80px; }
-    .audio-slider{ width:70px; }
+    .audio-slider-wrap.expanded{ width:96px; }
+    .audio-slider{ width:76px; }
   }
 
   .controls-hint{
@@ -1462,13 +1487,13 @@
     <div class="swipe-card-stack" id="swipeCardStack"></div>
 
     <div class="swipe-actions">
-      <button class="swipe-action keep" id="swipeKeepBtn" type="button" aria-label="留下">
+      <button class="swipe-action keep" id="swipeKeepBtn" type="button" aria-label="留下" data-swipe-sfx="1">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5-9 5-9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
       </button>
       <button class="swipe-action undo" id="swipeUndoBtn" type="button" aria-label="返回上一張">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12H9"/></svg>
       </button>
-      <button class="swipe-action discard" id="swipeDiscardBtn" type="button" aria-label="丟掉">
+      <button class="swipe-action discard" id="swipeDiscardBtn" type="button" aria-label="丟掉" data-swipe-sfx="1">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>
       </button>
     </div>
@@ -1543,11 +1568,13 @@
   ------------------------------------------------------------------- */
   var AudioManager = (function(){
     var sfxClick = new Audio('./assets/sfx/ui-pop.mp3');
+    var sfxDiscard = new Audio('./assets/bgm/leave.mp3'); // "丟掉" gets its own distinct cue, never stacked with ui-pop
     var bgmLanding = new Audio('./assets/bgm/open-rap.mp3');
     var bgmRoom = new Audio('./assets/bgm/room-vibe.mp3');
     bgmLanding.loop = true;
     bgmRoom.loop = true;
     sfxClick.volume = 0.5;
+    sfxDiscard.volume = 0.6;
 
     var state = { volume: 0.55, muted: false, unlocked: false };
     var fadeRaf = { landing: null, room: null };
@@ -1585,6 +1612,20 @@
       } catch (err){ /* ignore — SFX is a nice-to-have, never block the click */ }
     }
 
+    // Dedicated "丟掉" cue — called instead of (never in addition to)
+    // playClick() for that specific action; see commitSwipe() below,
+    // which is the single place all three discard triggers (drag, the
+    // 丟掉 button, and the → key) funnel through.
+    function playDiscard(){
+      if (state.muted) return;
+      try {
+        var s = sfxDiscard.cloneNode();
+        s.volume = 0.6 * (state.muted ? 0 : 1);
+        var p = s.play();
+        if (p && p.catch) p.catch(function(){});
+      } catch (err){ /* ignore */ }
+    }
+
     function startLanding(){
       if (!bgmRoom.paused) bgmRoom.pause();
       bgmLanding.volume = 0;
@@ -1592,12 +1633,30 @@
       fade(bgmLanding, 'landing', 0, effectiveVolume(), 500);
     }
 
-    function crossfadeToRoom(){
-      fade(bgmLanding, 'landing', bgmLanding.volume, 0, 500, function(){ bgmLanding.pause(); });
-      bgmRoom.currentTime = 0;
+    // Must be called SYNCHRONOUSLY from within a real click/pointerdown
+    // handler (see the confirm button in the name modal) — some browsers
+    // (Safari in particular) require play() to be in the same call stack
+    // as the user gesture, not merely "sometime after one on this page".
+    // This starts room-vibe.mp3 silently (volume 0) immediately on click,
+    // so by the time crossfadeToRoom() wants it audible — after the door
+    // transition, several seconds later — it's already a playing element
+    // that just needs its volume raised, not a fresh play() call too far
+    // removed from the gesture to be trusted.
+    function primeRoomBGM(){
       bgmRoom.volume = 0;
       safePlay(bgmRoom);
-      fade(bgmRoom, 'room', 0, effectiveVolume(), 700);
+    }
+
+    function crossfadeToRoom(){
+      fade(bgmLanding, 'landing', bgmLanding.volume, 0, 500, function(){ bgmLanding.pause(); });
+      if (bgmRoom.paused){
+        // fallback in case primeRoomBGM() wasn't called (or the browser
+        // still blocked it) — try again now regardless
+        bgmRoom.currentTime = 0;
+        bgmRoom.volume = 0;
+        safePlay(bgmRoom);
+      }
+      fade(bgmRoom, 'room', bgmRoom.volume, effectiveVolume(), 700);
     }
 
     function crossfadeToLanding(){
@@ -1634,6 +1693,8 @@
 
     return {
       playClick: playClick,
+      playDiscard: playDiscard,
+      primeRoomBGM: primeRoomBGM,
       crossfadeToRoom: crossfadeToRoom,
       crossfadeToLanding: crossfadeToLanding,
       setVolume: setVolume,
@@ -1644,8 +1705,12 @@
 
   // Delegated so every current AND future button on the page gets the
   // click SFX automatically — no need to wire each one individually.
+  // Buttons marked data-swipe-sfx handle their own sound (see
+  // commitSwipe(), which picks playClick vs playDiscard by direction)
+  // and are skipped here to avoid a doubled-up sound.
   document.addEventListener('click', function(e){
-    if (e.target.closest('button')) AudioManager.playClick();
+    var btn = e.target.closest('button');
+    if (btn && !btn.hasAttribute('data-swipe-sfx')) AudioManager.playClick();
   });
 
   function bindAudioPanel(prefix){
@@ -1841,6 +1906,7 @@
       return;
     }
     closeModal();
+    AudioManager.primeRoomBGM(); // synchronous, within this click — see primeRoomBGM's comment
     setTimeout(function(){ playEntrance(name); }, 220);
   });
 
@@ -3151,6 +3217,14 @@
     isAnimating = true;
     updateActionButtons();
 
+    // Single place all three ways to commit a swipe (drag release, the
+    // 留下/丟掉 buttons, and the ←/→ keys) converge — so the SFX only
+    // ever fires once per decision, never doubled up with the generic
+    // button-click delegation (see the click listener's data-swipe-sfx
+    // exclusion) and never missed for the drag/keyboard paths either.
+    if (direction === 'discard') AudioManager.playDiscard();
+    else AudioManager.playClick();
+
     // Captured now, not read again later — if the user closes/reopens the
     // swipe session while this card is still mid-flight, the stale timeout
     // below detects the mismatch and bails out instead of corrupting the
@@ -3362,8 +3436,8 @@
     if (swipeScene.classList.contains('active') &&
         !confirmDialogOverlay.classList.contains('active') &&
         !summaryModalOverlay.classList.contains('active')){
-      if (e.key === 'ArrowLeft'){ e.preventDefault(); AudioManager.playClick(); triggerButtonSwipe('keep'); }
-      else if (e.key === 'ArrowRight'){ e.preventDefault(); AudioManager.playClick(); triggerButtonSwipe('discard'); }
+      if (e.key === 'ArrowLeft'){ e.preventDefault(); triggerButtonSwipe('keep'); }
+      else if (e.key === 'ArrowRight'){ e.preventDefault(); triggerButtonSwipe('discard'); }
       else if (e.key === 'ArrowUp'){ e.preventDefault(); AudioManager.playClick(); undoSwipe(); }
     }
   });
