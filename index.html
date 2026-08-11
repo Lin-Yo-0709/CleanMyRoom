@@ -2207,11 +2207,18 @@
     ctx.lineWidth = 2;
     ctx.strokeRect(2, 2, w - 4, h - 4);
 
-    // furniture
+    // furniture — only draw items whose real position is known yet
+    // (populated once room.glb finishes loading; see wireLoadedFurniture).
+    // FURNITURE_CONFIG itself no longer carries pos/size — those come
+    // from the actual loaded model now, via furnitureRuntime.
+    var roomW = (ROOM_BOUNDS.maxX - ROOM_BOUNDS.minX) || 1;
+    var roomD = (ROOM_BOUNDS.maxZ - ROOM_BOUNDS.minZ) || 1;
     FURNITURE_CONFIG.forEach(function(cfg){
-      var p = toMap(cfg.pos[0], cfg.pos[2]);
-      var fw = Math.max(6, (cfg.size[0] / 16) * w);
-      var fh = Math.max(6, (cfg.size[2] / 18) * h);
+      var rt = furnitureRuntime[cfg.id];
+      if (!rt) return;
+      var p = toMap(rt.pos[0], rt.pos[2]);
+      var fw = Math.max(6, (rt.size[0] / roomW) * w);
+      var fh = Math.max(6, (rt.size[1] / roomD) * h);
       ctx.fillStyle = '#' + cfg.color.toString(16).padStart(6, '0');
       ctx.fillRect(p[0] - fw / 2, p[1] - fh / 2, fw, fh);
     });
