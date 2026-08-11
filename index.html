@@ -1811,6 +1811,14 @@
   var hovered = null;
   var controlsPaused = false;
 
+  // Wall/furniture collision — a separate raycaster (kept independent of
+  // the hover-picking one and its Line threshold tweak above) fired from
+  // the camera each frame along its movement direction. collidableRoot
+  // is the whole loaded model (walls + furniture), set once room.glb loads.
+  var collidableRoot = null;
+  var collisionRaycaster = null;
+  var COLLISION_BUFFER = 0.4; // meters — matches the spec's stop distance
+
   var player = { x:0, y:1.7, z:5.6, yaw:0, pitch:0 };
   var keys = {};
   var isDragging = false;
@@ -1847,6 +1855,11 @@
     scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 
     raycaster = new THREE.Raycaster();
+    // r128 defaults Line hit-testing to a 1-world-unit threshold, which
+    // can make hover trigger well before the cursor is actually over a
+    // mesh if the model contains any thin/line geometry. Tighten it.
+    raycaster.params.Line.threshold = 0.01;
+    collisionRaycaster = new THREE.Raycaster();
     mouseVec = new THREE.Vector2();
     clock = new THREE.Clock();
 
@@ -1899,6 +1912,7 @@
       ROOM_MODEL_PATH,
       function onLoad(gltf){
         scene.add(gltf.scene);
+        collidableRoot = gltf.scene; // walls + furniture now block WASD movement (see updateMovement)
         wireLoadedFurniture(gltf);
         wireDefaultCamera(gltf);
         wireModelAnimations(gltf);
@@ -1957,10 +1971,11 @@
 
       var outline = new THREE.LineSegments(
         new THREE.EdgesGeometry(new THREE.BoxGeometry(size.x, size.y, size.z)),
-        new THREE.LineBasicMaterial({ color: 0xfff6e0, linewidth: 2 })
+        new THREE.LineBasicMaterial({ color: 0xfff6e0, linewidth: 1, transparent: true, opacity: 0.5 })
       );
       outline.position.copy(parentObj.worldToLocal(center.clone()));
       outline.visible = false;
+      outline.raycast = function(){}; // never itself a hit target — only the real mesh geometry should be
       parentObj.add(outline);
 
       parentObj.userData = { id: cfg.id, label: cfg.label, meshes: meshes, outline: outline, actions: [] };
@@ -1988,17 +2003,26 @@
     });
   }
 
-  // If the model has a camera/empty named "DefaultCamera", use its
-  // authored transform as the player's spawn point instead of the
-  // generic fallback.
+  // Prefers a real camera authored in Blender and exported into
+  // gltf.cameras (named "FPS_Camera", or just the first one found) as the
+  // player's spawn transform. Falls back to a plain Empty named
+  // "DefaultCamera" for models that don't export an actual camera node.
+  // Its Position/Rotation are copied onto our own render camera (via
+  // DEFAULT_SPAWN → resetCamera()) rather than swapping camera objects,
+  // so aspect ratio, resize handling, and controls all keep working
+  // unchanged.
   function wireDefaultCamera(gltf){
-    var defaultCam = gltf.scene.getObjectByName('DefaultCamera');
-    if (!defaultCam) return;
+    var srcCam = null;
+    if (gltf.cameras && gltf.cameras.length){
+      srcCam = gltf.cameras.find(function(c){ return c.name === 'FPS_Camera'; }) || gltf.cameras[0];
+    }
+    if (!srcCam) srcCam = gltf.scene.getObjectByName('DefaultCamera');
+    if (!srcCam) return;
 
     var worldPos = new THREE.Vector3();
-    defaultCam.getWorldPosition(worldPos);
+    srcCam.getWorldPosition(worldPos);
     var worldQuat = new THREE.Quaternion();
-    defaultCam.getWorldQuaternion(worldQuat);
+    srcCam.getWorldQuaternion(worldQuat);
     var euler = new THREE.Euler().setFromQuaternion(worldQuat, 'YXZ');
 
     DEFAULT_SPAWN = { x: worldPos.x, y: worldPos.y, z: worldPos.z, yaw: euler.y, pitch: euler.x };
@@ -2053,16 +2077,25 @@
   // Toggles emissive highlight across every real mesh under a furniture
   // parent (it may be one joined mesh or several) — this is what makes
   // hover work regardless of how the item was authored in Blender.
+  //
+  // Blender/glTF exports frequently reuse one material across several
+  // objects (e.g. a shared "Wood" material). Mutating that material
+  // directly would highlight every other object using it too — so each
+  // mesh gets its own cloned material the first time it's highlighted,
+  // and hover-off restores the original (untouched, still-shared) one.
   function setMeshesEmissive(root, on){
     (root.userData.meshes || []).forEach(function(m){
       if (!m.material || !m.material.emissive) return;
+      if (!m.userData.highlightMaterial){
+        m.userData.originalMaterial = m.material;
+        m.userData.highlightMaterial = m.material.clone();
+      }
       if (on){
-        if (m.userData.origEmissive == null) m.userData.origEmissive = m.material.emissive.getHex();
+        m.material = m.userData.highlightMaterial;
         m.material.emissive.setHex(0xfff2c9);
-        m.material.emissiveIntensity = 0.55;
+        m.material.emissiveIntensity = 0.22; // subtle — kept within 0.15–0.3
       } else {
-        m.material.emissive.setHex(m.userData.origEmissive != null ? m.userData.origEmissive : 0x000000);
-        m.material.emissiveIntensity = 0;
+        m.material = m.userData.originalMaterial;
       }
     });
   }
@@ -2179,7 +2212,23 @@
     if (keys['KeyA']) move.sub(right);
 
     if (move.lengthSq() > 0){
-      move.normalize().multiplyScalar(speed);
+      move.normalize();
+      var allowedDist = speed;
+
+      // Wall/furniture collision: cast a ray from the camera along the
+      // intended direction and shorten this step if something solid is
+      // closer than COLLISION_BUFFER, so the camera can't clip through
+      // the loaded model's geometry.
+      if (collidableRoot){
+        collisionRaycaster.set(new THREE.Vector3(player.x, player.y, player.z), move);
+        collisionRaycaster.far = speed + COLLISION_BUFFER;
+        var hits = collisionRaycaster.intersectObject(collidableRoot, true);
+        if (hits.length && hits[0].distance < speed + COLLISION_BUFFER){
+          allowedDist = Math.max(0, hits[0].distance - COLLISION_BUFFER);
+        }
+      }
+
+      move.multiplyScalar(allowedDist);
       player.x += move.x;
       player.z += move.z;
       player.x = Math.max(ROOM_BOUNDS.minX, Math.min(ROOM_BOUNDS.maxX, player.x));
