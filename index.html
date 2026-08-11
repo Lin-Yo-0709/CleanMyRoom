@@ -1817,7 +1817,25 @@
   // is the whole loaded model (walls + furniture), set once room.glb loads.
   var collidableRoot = null;
   var collisionRaycaster = null;
-  var COLLISION_BUFFER = 0.4; // meters — matches the spec's stop distance
+  var COLLISION_BUFFER = 0.4; // meters — default stop distance
+  // multi_tier_cabinet/bed = current ids for what was originally named
+  // "nightstand"; long_cabinet = current id for what was "cabinet". Both
+  // get extra clearance per the clip-through bug report.
+  var COLLISION_BUFFER_OVERRIDES = { multi_tier_cabinet: 0.7, bed: 0.6, long_cabinet: 0.7 };
+  var MAX_COLLISION_BUFFER = 0.7; // largest override value, used to size the collision ray
+
+  // Camera-tween lock — true while a scripted camera move (currently just
+  // the [R] emergency reset) is in progress. WASD/mouse-look and furniture
+  // hover/trigger events are all suspended until it clears, and it is
+  // *guaranteed* to clear (see startCameraReset()'s watchdog) so the
+  // viewport can never get stuck mid-transition.
+  var isCameraTransitioning = false;
+  var cameraTween = null;
+
+  var velocity = null; // THREE.Vector3, persists across frames for movement damping
+  var MOVE_MAX_SPEED = 3.2;  // world units/sec — slower, more comfortable base speed
+  var MOVE_ACCEL = 10;       // how quickly velocity ramps up while a key is held
+  var MOVE_DECEL = 5;        // how quickly it glides to a stop after release (inertia)
 
   var player = { x:0, y:1.7, z:5.6, yaw:0, pitch:0 };
   var keys = {};
@@ -1845,7 +1863,7 @@
     scene.background = new THREE.Color(0xbfe0e8);
     scene.fog = new THREE.Fog(0xbfe0e8, 18, 34);
 
-    camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.05, 100);
     camera.rotation.order = 'YXZ';
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x6b5240, 0.9));
@@ -1860,6 +1878,7 @@
     // mesh if the model contains any thin/line geometry. Tighten it.
     raycaster.params.Line.threshold = 0.01;
     collisionRaycaster = new THREE.Raycaster();
+    velocity = new THREE.Vector3(0, 0, 0);
     mouseVec = new THREE.Vector2();
     clock = new THREE.Clock();
 
@@ -2070,6 +2089,60 @@
   function resetCamera(){
     player.x = DEFAULT_SPAWN.x; player.y = DEFAULT_SPAWN.y; player.z = DEFAULT_SPAWN.z;
     player.yaw = DEFAULT_SPAWN.yaw; player.pitch = DEFAULT_SPAWN.pitch;
+    if (velocity) velocity.set(0, 0, 0);
+    camera.position.set(player.x, player.y, player.z);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  }
+
+  function lerp(a, b, t){ return a + (b - a) * t; }
+
+  var cameraResetWatchdog = null;
+
+  // [R] emergency reset — smoothly tweens back to the spawn transform
+  // instead of an instant snap. isCameraTransitioning suspends WASD,
+  // mouse-look, and furniture hover/trigger events for the duration; the
+  // watchdog timeout guarantees that lock is released even if something
+  // unexpected interrupts the tween (a stalled tab, an exception, etc.),
+  // matching the "must never stay stuck" requirement.
+  function startCameraReset(){
+    if (isCameraTransitioning) return;
+    isCameraTransitioning = true;
+    setHover(null);
+
+    var from = { x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch };
+    var to = DEFAULT_SPAWN;
+    // shortest-path yaw delta, so a 350°→10° reset turns 20° forward
+    // instead of spinning almost all the way around
+    var TAU = Math.PI * 2;
+    var yawDelta = ((to.yaw - from.yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
+
+    cameraTween = { from: from, to: to, yawDelta: yawDelta, startTime: performance.now(), duration: 550 };
+
+    clearTimeout(cameraResetWatchdog);
+    cameraResetWatchdog = setTimeout(function(){
+      if (!isCameraTransitioning) return;
+      console.warn('[R] camera reset watchdog fired — forcing the lock open');
+      cameraTween = null;
+      isCameraTransitioning = false;
+    }, cameraTween.duration + 500);
+  }
+
+  function updateCameraTween(){
+    if (!cameraTween) return;
+    var t = (performance.now() - cameraTween.startTime) / cameraTween.duration;
+    if (t >= 1){
+      player.x = cameraTween.to.x; player.z = cameraTween.to.z;
+      player.yaw = cameraTween.to.yaw; player.pitch = cameraTween.to.pitch;
+      cameraTween = null;
+      clearTimeout(cameraResetWatchdog);
+      isCameraTransitioning = false; // guaranteed release on the normal path too
+    } else {
+      var ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      player.x = lerp(cameraTween.from.x, cameraTween.to.x, ease);
+      player.z = lerp(cameraTween.from.z, cameraTween.to.z, ease);
+      player.yaw = cameraTween.from.yaw + cameraTween.yawDelta * ease;
+      player.pitch = lerp(cameraTween.from.pitch, cameraTween.to.pitch, ease);
+    }
     camera.position.set(player.x, player.y, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
   }
@@ -2140,7 +2213,7 @@
   }
 
   function onCanvasMouseDown(e){
-    if (!roomActive || controlsPaused) return;
+    if (!roomActive || controlsPaused || isCameraTransitioning) return;
     if (e.button !== 0) return;
     isDragging = true;
     dragMoved = false;
@@ -2186,6 +2259,10 @@
 
   function onRoomKeyDown(e){
     if (!roomActive) return;
+    if (e.code === 'KeyR'){
+      startCameraReset();
+      return;
+    }
     keys[e.code] = true;
   }
   function onRoomKeyUp(e){
@@ -2200,35 +2277,55 @@
   }
 
   function updateMovement(dt){
-    if (controlsPaused) return;
+    if (controlsPaused || isCameraTransitioning) return;
+
     var forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
     var right = new THREE.Vector3(-forward.z, 0, forward.x);
-    var speed = 4.4 * dt;
-    var move = new THREE.Vector3();
+    var wish = new THREE.Vector3();
 
-    if (keys['KeyW']) move.add(forward);
-    if (keys['KeyS']) move.sub(forward);
-    if (keys['KeyD']) move.add(right);
-    if (keys['KeyA']) move.sub(right);
+    if (keys['KeyW']) wish.add(forward);
+    if (keys['KeyS']) wish.sub(forward);
+    if (keys['KeyD']) wish.add(right);
+    if (keys['KeyA']) wish.sub(right);
+    if (wish.lengthSq() > 0) wish.normalize();
 
-    if (move.lengthSq() > 0){
-      move.normalize();
-      var allowedDist = speed;
+    // Velocity-based damping: ease toward the target speed while a key is
+    // held (MOVE_ACCEL), and glide to a stop with a little inertia after
+    // release (MOVE_DECEL) — framerate-independent exponential smoothing.
+    var hasInput = wish.lengthSq() > 0;
+    var targetVel = wish.multiplyScalar(MOVE_MAX_SPEED);
+    var rate = hasInput ? MOVE_ACCEL : MOVE_DECEL;
+    var t = 1 - Math.exp(-rate * dt);
+    velocity.x += (targetVel.x - velocity.x) * t;
+    velocity.z += (targetVel.z - velocity.z) * t;
+    if (velocity.lengthSq() < 0.0004) velocity.set(0, 0, 0); // snap out imperceptible residual drift
+
+    if (velocity.lengthSq() > 0){
+      var dist = velocity.length() * dt;
+      var dir = velocity.clone().normalize();
+      var allowedDist = dist;
 
       // Wall/furniture collision: cast a ray from the camera along the
       // intended direction and shorten this step if something solid is
-      // closer than COLLISION_BUFFER, so the camera can't clip through
-      // the loaded model's geometry.
+      // closer than its buffer distance, so the camera can't clip
+      // through the loaded model's geometry. A couple of furniture items
+      // (nightstand/multi-tier cabinet, long cabinet) get extra
+      // clearance — see COLLISION_BUFFER_OVERRIDES.
       if (collidableRoot){
-        collisionRaycaster.set(new THREE.Vector3(player.x, player.y, player.z), move);
-        collisionRaycaster.far = speed + COLLISION_BUFFER;
+        collisionRaycaster.set(new THREE.Vector3(player.x, player.y, player.z), dir);
+        collisionRaycaster.far = dist + MAX_COLLISION_BUFFER;
         var hits = collisionRaycaster.intersectObject(collidableRoot, true);
-        if (hits.length && hits[0].distance < speed + COLLISION_BUFFER){
-          allowedDist = Math.max(0, hits[0].distance - COLLISION_BUFFER);
+        if (hits.length){
+          var hitRoot = resolveFurnitureRoot(hits[0].object);
+          var buffer = (hitRoot && COLLISION_BUFFER_OVERRIDES[hitRoot.userData.id]) || COLLISION_BUFFER;
+          if (hits[0].distance < dist + buffer){
+            allowedDist = Math.max(0, hits[0].distance - buffer);
+            velocity.set(0, 0, 0); // don't keep "pressing" into whatever was hit
+          }
         }
       }
 
-      move.multiplyScalar(allowedDist);
+      var move = dir.multiplyScalar(allowedDist);
       player.x += move.x;
       player.z += move.z;
       player.x = Math.max(ROOM_BOUNDS.minX, Math.min(ROOM_BOUNDS.maxX, player.x));
@@ -2289,20 +2386,29 @@
 
   function animateRoom(){
     if (!roomActive) return;
-    rafId = requestAnimationFrame(animateRoom);
+    rafId = requestAnimationFrame(animateRoom); // scheduled first — the loop self-heals even if the body below throws
 
-    var dt = clock ? Math.min(clock.getDelta(), 0.05) : 0.016;
-    updateMovement(dt);
-    mixers.forEach(function(mixer){ mixer.update(dt); });
+    try {
+      var dt = clock ? Math.min(clock.getDelta(), 0.05) : 0.016;
 
-    if (!isDragging && !controlsPaused){
-      var hit = pickFurniture();
-      setHover(hit);
-      renderer.domElement.classList.toggle('hovering', !!hit);
+      if (isCameraTransitioning){
+        updateCameraTween();
+      } else {
+        updateMovement(dt);
+      }
+      mixers.forEach(function(mixer){ mixer.update(dt); });
+
+      if (!isDragging && !controlsPaused && !isCameraTransitioning){
+        var hit = pickFurniture();
+        setHover(hit);
+        renderer.domElement.classList.toggle('hovering', !!hit);
+      }
+
+      drawMinimap();
+      renderer.render(scene, camera);
+    } catch (err) {
+      console.error('animateRoom frame failed (recovering next frame)', err);
     }
-
-    drawMinimap();
-    renderer.render(scene, camera);
   }
 
   function enterRoomScene(){
@@ -2934,14 +3040,28 @@
   document.getElementById('homeIcon').addEventListener('click', confirmGoHome);
 
   document.addEventListener('keydown', function(e){
-    if (e.key !== 'Escape') return;
-    if (confirmDialogOverlay.classList.contains('active')){ closeConfirmDialog(); return; }
-    if (summaryModalOverlay.classList.contains('active')){ closeSwipeSummary(); return; }
-    if (swipeScene.classList.contains('active')){ swipeCloseBtn.click(); return; }
-    if (!roomActive) return;
-    if (itemDetailModalOverlay.classList.contains('active')) closeItemDetailModal();
-    else if (furnitureModalOverlay.classList.contains('active')) closeFurnitureModal();
-    else if (statsModalOverlay.classList.contains('active')) closeStatsModal();
+    if (e.key === 'Escape'){
+      if (confirmDialogOverlay.classList.contains('active')){ closeConfirmDialog(); return; }
+      if (summaryModalOverlay.classList.contains('active')){ closeSwipeSummary(); return; }
+      if (swipeScene.classList.contains('active')){ swipeCloseBtn.click(); return; }
+      if (!roomActive) return;
+      if (itemDetailModalOverlay.classList.contains('active')) closeItemDetailModal();
+      else if (furnitureModalOverlay.classList.contains('active')) closeFurnitureModal();
+      else if (statsModalOverlay.classList.contains('active')) closeStatsModal();
+      return;
+    }
+
+    // Keyboard shortcuts for the swipe (斷捨離) deck — only while it's the
+    // active, unobstructed view (no confirm/summary dialog on top), and
+    // routed through triggerButtonSwipe() so they get exactly the same
+    // isAnimating guard, disabled-state handling, and fly-out animation
+    // as clicking the on-screen buttons.
+    if (swipeScene.classList.contains('active') &&
+        !confirmDialogOverlay.classList.contains('active') &&
+        !summaryModalOverlay.classList.contains('active')){
+      if (e.key === 'ArrowLeft'){ e.preventDefault(); triggerButtonSwipe('keep'); }
+      else if (e.key === 'ArrowRight'){ e.preventDefault(); triggerButtonSwipe('discard'); }
+    }
   });
 
   buildZoneProgressUI();
