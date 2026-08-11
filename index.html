@@ -546,6 +546,70 @@
   #roomCanvas.dragging{ cursor: grabbing; }
   #roomCanvas.hovering{ cursor: pointer; }
 
+  .room-loading{
+    position:absolute;
+    inset:0;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    background: rgba(191,224,232,0.92);
+    z-index:40;
+    color: var(--ink);
+  }
+  .room-loading.visible{ display:flex; }
+  .room-loading-spinner{
+    width:40px; height:40px;
+    border-radius:50%;
+    border:4px solid rgba(43,35,28,0.15);
+    border-top-color: var(--coral-deep);
+    animation: room-spin 0.9s linear infinite;
+  }
+  @keyframes room-spin{ to{ transform: rotate(360deg); } }
+  .room-loading-text{ font-weight:700; font-size:14px; }
+
+  .room-load-error{
+    position:absolute;
+    inset:0;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background: rgba(239,231,216,0.97);
+    z-index:41;
+    text-align:center;
+    padding:24px;
+  }
+  .room-load-error.visible{ display:flex; }
+  .room-load-error p{ margin:0; font-weight:700; }
+  .room-load-error-detail{
+    font-weight:400 !important;
+    font-size:13px;
+    color: var(--ink-soft);
+    max-width:320px;
+  }
+  .room-load-error-detail code{
+    background:#e6dcc4;
+    padding:1px 5px;
+    border-radius:4px;
+    font-size:12px;
+  }
+  #roomLoadRetryBtn{
+    margin-top:8px;
+    font-weight:700;
+    font-size:13px;
+    padding:10px 22px;
+    border-radius:999px;
+    border:none;
+    background: var(--coral-deep);
+    color: var(--paper);
+    cursor:pointer;
+    transition: transform .15s ease;
+  }
+  #roomLoadRetryBtn:hover{ transform: translateY(-1px); }
+
   .room-hud-left{
     position:absolute;
     top:20px; left:20px;
@@ -616,14 +680,19 @@
   .zone-progress .zstatus.partial{ background: var(--gold); color: var(--ink); }
   .zone-progress .zstatus.done{ background: #6fbf8b; color: #103018; }
 
-  .room-hud-right{
-    position:absolute;
+  /* Fixed to the viewport (not #roomScene or #swipeScene), with a
+     z-index above both of them — see the HTML comment by this markup
+     for why nesting it inside either scene can never work regardless
+     of the z-index given to it there. */
+  .global-hud-right{
+    position:fixed;
     top:16px; right:16px;
-    display:flex;
+    display:none;
     flex-direction:column;
     gap:12px;
-    z-index:60;
+    z-index:150; /* above room (50) and swipe (120), below modals (300) */
   }
+  .global-hud-right.visible{ display:flex; }
 
   .hud-icon{
     width:46px; height:46px;
@@ -819,12 +888,17 @@
   .swipe-scene.active{ display:flex; }
 
   .swipe-topbar{
-    display:flex;
-    align-items:center;
-    gap:16px;
+    position:relative;
+    z-index:350; /* above the card stack (50) AND modals (300) — the X must stay usable even during the summary modal */
+    display:grid;
+    grid-template-columns: var(--topbar-gutter) minmax(0,1fr) var(--topbar-gutter);
+    align-items:flex-start;
+    column-gap:12px;
     padding: 18px clamp(16px, 4vw, 40px) 6px;
+    --topbar-gutter: 154px;
   }
   .swipe-x{
+    justify-self:start;
     flex-shrink:0;
     width:40px; height:40px;
     border:none;
@@ -837,12 +911,13 @@
   }
   .swipe-x:hover{ transform: translateY(-1px); }
 
-  /* centered on its own, matching the card width below, regardless of
-     the (asymmetric) X button and icon-column widths on either side */
+  /* centered in its own grid column, matching the card width below —
+     the two side gutters are equal width, so this is truly centered
+     regardless of the X button vs. icon-column width difference */
   .swipe-zone-info{
-    flex:0 1 var(--card-w);
+    justify-self:center;
     width:var(--card-w);
-    margin:0 auto;
+    max-width:100%;
     text-align:center;
   }
   .swipe-zone-name{
@@ -867,10 +942,6 @@
     transition: width .3s ease;
   }
 
-  .swipe-hud-right{ flex-shrink:0; display:flex; gap:10px; }
-  .swipe-hud-right .hud-icon{ width:40px; height:40px; box-shadow: 0 6px 14px rgba(43,25,14,0.16); }
-  .swipe-hud-right .hud-icon svg{ width:18px; height:18px; }
-
   .swipe-count{
     text-align:center;
     font-size:13px;
@@ -882,6 +953,7 @@
 
   .swipe-card-stack{
     position:relative;
+    z-index:1; /* stays below .swipe-topbar's z-index:200 */
     flex:1;
     display:flex;
     align-items:center;
@@ -990,6 +1062,11 @@
     gap:22px;
     padding: 10px 0 clamp(20px, 4vh, 40px);
   }
+  /* once a zone is fully sorted: no gray placeholders, no dead buttons —
+     the summary modal (plus the always-visible X and global nav icons)
+     is the only path forward */
+  .swipe-scene.finished .swipe-card-stack,
+  .swipe-scene.finished .swipe-actions{ visibility:hidden; }
   .swipe-action{
     border:none;
     border-radius:50%;
@@ -1003,6 +1080,13 @@
   }
   .swipe-action:hover{ transform: translateY(-2px) scale(1.05); }
   .swipe-action:active{ transform: translateY(0) scale(0.96); }
+  .swipe-action:disabled{
+    opacity:0.4;
+    cursor:not-allowed;
+    box-shadow:none;
+    transform:none;
+  }
+  .swipe-action:disabled:hover{ transform:none; }
   .swipe-action.keep{ width:60px; height:60px; background: #4caf50; }
   .swipe-action.discard{ width:60px; height:60px; background: #ef5350; }
   .swipe-action.undo{ width:48px; height:48px; background: var(--ink-soft); }
@@ -1032,8 +1116,8 @@
     .furniture-list li{ grid-template-columns: minmax(50px,1fr) auto minmax(70px,1fr) auto auto; font-size:12px; }
     .detail-body{ flex-direction:column; align-items:center; text-align:center; }
     .detail-info .detail-percentages{ justify-content:center; }
-    .swipe-topbar{ flex-wrap:wrap; }
-    .swipe-hud-right{ order:3; width:100%; justify-content:center; margin-top:8px; }
+    .swipe-topbar{ --topbar-gutter: 64px; column-gap:8px; }
+    .swipe-x{ width:34px; height:34px; font-size:15px; }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -1148,6 +1232,17 @@
   <div class="room-scene" id="roomScene">
     <canvas id="roomCanvas"></canvas>
 
+    <div class="room-loading" id="roomLoading">
+      <div class="room-loading-spinner"></div>
+      <div class="room-loading-text">正在載入房間… <span id="roomLoadingPercent">0%</span></div>
+    </div>
+
+    <div class="room-load-error" id="roomLoadError">
+      <p>房間模型載入失敗</p>
+      <p class="room-load-error-detail">找不到 <code>./assets/models/room.glb</code>，請確認檔案已放在正確路徑。</p>
+      <button id="roomLoadRetryBtn" type="button">重試</button>
+    </div>
+
     <div class="room-hud-left">
       <div class="room-logo">Clean <span>My</span> Room</div>
       <canvas class="minimap-canvas" id="minimapCanvas" width="160" height="160" aria-label="房間頂視小地圖"></canvas>
@@ -1162,18 +1257,25 @@
       <div class="key-row"><span class="key">A</span><span class="key">S</span><span class="key">D</span></div>
       <p>WASD 移動・拖曳滑鼠環顧四周<br>左鍵點擊家具互動</p>
     </div>
+  </div>
 
-    <div class="room-hud-right">
-      <button class="hud-icon" id="homeIcon" type="button" aria-label="回到首頁" title="回到首頁">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M9.5 20v-6h5v6"/></svg>
-      </button>
-      <button class="hud-icon" id="statsIcon" type="button" aria-label="詳細物品統計" title="詳細物品統計">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><circle cx="20" cy="18" r="1.6" fill="currentColor" stroke="none"/></svg>
-      </button>
-      <button class="hud-icon" id="chatIcon" type="button" aria-label="留言區" title="留言區">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>
-      </button>
-    </div>
+  <!-- Top-right nav icons — deliberately NOT nested inside #roomScene or
+       #swipeScene. Both those layers are position:fixed with their own
+       z-index, which creates separate stacking contexts; a child's
+       z-index can never escape its own ancestor's context. Living here,
+       as an independent sibling with the highest z-index on the page,
+       is what actually guarantees these stay on top in both 3D-room and
+       swipe modes — reused as-is, layout unchanged, in both places. -->
+  <div class="global-hud-right" id="globalHudRight">
+    <button class="hud-icon" id="homeIcon" type="button" aria-label="回到首頁" title="回到首頁">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M9.5 20v-6h5v6"/></svg>
+    </button>
+    <button class="hud-icon" id="statsIcon" type="button" aria-label="詳細物品統計" title="詳細物品統計">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><circle cx="20" cy="18" r="1.6" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <button class="hud-icon" id="chatIcon" type="button" aria-label="留言區" title="留言區">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>
+    </button>
   </div>
 
   <!-- Furniture interaction modal -->
@@ -1233,17 +1335,6 @@
         <div class="swipe-count"><span id="swipeCurrent">1</span> / <span id="swipeTotal">8</span></div>
         <div class="swipe-progress-track"><div class="swipe-progress-fill" id="swipeProgressFill"></div></div>
       </div>
-      <div class="swipe-hud-right">
-        <button class="hud-icon" id="swipeHomeIcon" type="button" aria-label="回到首頁" title="回到首頁">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M9.5 20v-6h5v6"/></svg>
-        </button>
-        <button class="hud-icon" id="swipeStatsIcon" type="button" aria-label="房間物品統計" title="房間物品統計">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><circle cx="20" cy="18" r="1.6" fill="currentColor" stroke="none"/></svg>
-        </button>
-        <button class="hud-icon" id="swipeChatIcon" type="button" aria-label="留言區" title="留言區">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>
-        </button>
-      </div>
     </div>
 
     <div class="swipe-card-stack" id="swipeCardStack"></div>
@@ -1295,13 +1386,9 @@
   ============================================================= -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-  <!--
-    GLTFLoader placeholder — uncomment when room.glb is ready to swap in
-    for the placeholder cubes. Load order matters: this script must come
-    after three.min.js above.
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js"></script>
-  -->
+  <!-- GLTFLoader r128 (matches three.min.js above). cdnjs doesn't mirror
+       three.js's examples/ folder, so this comes from jsDelivr instead. -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
 (function(){
@@ -1570,68 +1657,79 @@
 
   /* ----------------------------------------------------------------
      Furniture config — Blender naming spec (parent mesh + child
-     animated sub-parts). Each child gets its own AnimationMixer/action
-     so e.g. a desk's two drawers can slide independently. These exact
-     strings are used by buildFurniture() (mesh.name for the parent and
-     each child) and by the GLTFLoader placeholder below.
+     animated sub-parts). "color" is only used for UI accents (minimap
+     dots, stats-modal tabs, swipe-card tint) — it has nothing to do
+     with the 3D geometry, which now comes entirely from room.glb.
+     parentName / children[].name / children[].action must match the
+     object and animation-action names exported from Blender exactly;
+     see wireLoadedFurniture() below for how they're resolved.
   ----------------------------------------------------------------- */
   var FURNITURE_CONFIG = [
     {
-      id:'desk', label:'書桌', color:0xdf6b4e, size:[2.4, 1.0, 1.2], pos:[-5.4, 0.5, -7.2],
+      id:'desk', label:'書桌', color:0xdf6b4e,
       parentName:'Desk',
       children:[
-        { name:'Desk_drawer_01', action:'Desk_drawer_01_open', type:'slideZ', local:[-0.6, -0.15, 0.6], size:[0.95, 0.32, 0.5] },
-        { name:'Desk_drawer_02', action:'Desk_drawer_02_open', type:'slideZ', local:[ 0.6, -0.15, 0.6], size:[0.95, 0.32, 0.5] }
+        { name:'Desk_drawer_01', action:'Desk_drawer_01_open' },
+        { name:'Desk_drawer_02', action:'Desk_drawer_02_open' }
       ]
     },
     {
-      id:'large_wardrobe', label:'大衣櫃', color:0x4a2a1e, size:[1.6, 3.2, 1.0], pos:[-7.0, 1.6, -1.6],
+      id:'large_wardrobe', label:'大衣櫃', color:0x4a2a1e,
       parentName:'Large_wardrobe',
       children:[
-        { name:'Large_wardrobe_door_01', action:'Large_wardrobe_door_01_open', type:'slideX', dir:-1, local:[-0.4, 0, 0.52], size:[0.76, 3.0, 0.08] },
-        { name:'Large_wardrobe_door_02', action:'Large_wardrobe_door_02_open', type:'slideX', dir: 1, local:[ 0.4, 0, 0.52], size:[0.76, 3.0, 0.08] }
+        { name:'Large_wardrobe_door_01', action:'Large_wardrobe_door_01_open' },
+        { name:'Large_wardrobe_door_02', action:'Large_wardrobe_door_02_open' }
       ]
     },
     {
-      id:'bed', label:'床頭', color:0xe0a53d, size:[3.2, 0.9, 4.2], pos:[ 5.0, 0.45,-4.6],
+      id:'bed', label:'床頭', color:0xe0a53d,
       parentName:'Bed',
       children:[
-        { name:'Bed_pillow_01', action:'Bed_pillow_01_open', type:'lidRotate', local:[0, 0.5, -1.6], size:[2.6, 0.2, 1.0] }
+        { name:'Bed_pillow_01', action:'Bed_pillow_01_open' }
       ]
     },
     {
-      id:'wardrobe', label:'衣櫃', color:0x8c5236, size:[1.4, 2.6, 0.6], pos:[-7.0, 1.3,  3.4],
+      id:'wardrobe', label:'衣櫃', color:0x8c5236,
       parentName:'Wardrobe',
       children:[
-        { name:'Wardrobe_door_01',  action:'Wardrobe_door_01_open',  type:'slideX',   dir:-1, local:[0, 0.75, 0.32], size:[1.2, 1.0, 0.1] },
-        { name:'Wardrobe_door_02',  action:'Wardrobe_door_02_open',  type:'slideZ',   local:[-0.32, -0.35, 0.32], size:[0.55, 0.5, 0.15] },
-        { name:'Wardrobe_door_03',  action:'Wardrobe_door_03_open',  type:'slideZ',   local:[ 0.32, -0.35, 0.32], size:[0.55, 0.5, 0.15] }
+        { name:'Wardrobe_door_01', action:'Wardrobe_door_01_open' },
+        { name:'Wardrobe_door_02', action:'Wardrobe_door_02_open' },
+        { name:'Wardrobe_door_03', action:'Wardrobe_door_03_open' }
       ]
     },
     {
-      id:'low_cabinet', label:'矮櫃', color:0x4f8f8c, size:[3.6, 0.4, 2.0], pos:[ 0.0, 0.2, -9.0],
+      id:'low_cabinet', label:'矮櫃', color:0x4f8f8c,
       parentName:'Low_cabinet',
       children:[
-        { name:'Low_cabinet_drawer_01', action:'Low_cabinet_drawer_01_open', type:'slideZ', local:[0, 0, 0.9], size:[3.0, 0.3, 0.4] }
+        { name:'Low_cabinet_drawer_01', action:'Low_cabinet_drawer_01_open' }
       ]
     },
     {
-      id:'long_cabinet', label:'長條櫃', color:0x7c9473, size:[1.6, 1.6, 1.0], pos:[ 6.6, 0.8,  1.8],
+      id:'long_cabinet', label:'長條櫃', color:0x7c9473,
       parentName:'Long_cabinet',
       children:[
-        { name:'Long_cabinet_door_01', action:'Long_cabinet_door_01_open', type:'lidRotate', local:[0, 0.75, 0], size:[1.4, 0.15, 0.9] }
+        { name:'Long_cabinet_door_01', action:'Long_cabinet_door_01_open' }
       ]
     },
     {
-      id:'multi_tier_cabinet', label:'多層櫃', color:0xcf9f42, size:[0.8, 0.7, 0.8], pos:[ 6.6, 0.35,-6.4],
+      id:'multi_tier_cabinet', label:'多層櫃', color:0xcf9f42,
       parentName:'Multi-tier_cabinet',
       children:[
-        { name:'Multi-tier_cabinet_drawer_01', action:'Multi-tier_cabinet_drawer_01_open', type:'lidRotate', local:[0,  0.2, 0.3], size:[0.7, 0.14, 0.55] },
-        { name:'Multi-tier_cabinet_drawer_02', action:'Multi-tier_cabinet_drawer_02_open', type:'lidRotate', local:[0, -0.15, 0.3], size:[0.7, 0.14, 0.55] }
+        { name:'Multi-tier_cabinet_drawer_01', action:'Multi-tier_cabinet_drawer_01_open' },
+        { name:'Multi-tier_cabinet_drawer_02', action:'Multi-tier_cabinet_drawer_02_open' }
       ]
     }
   ];
-  var ROOM_BOUNDS = { minX:-7.4, maxX:7.4, minZ:-9.0, maxZ:8.0 };
+
+  // Fallback room bounds used only until room.glb has finished loading
+  // and computeRoomBounds() can derive real ones from its geometry.
+  var ROOM_BOUNDS = { minX:-30, maxX:30, minZ:-30, maxZ:30 };
+  // Fallback camera spawn, likewise overridden once room.glb loads (by
+  // its "DefaultCamera" node if present — see wireDefaultCamera()).
+  var DEFAULT_SPAWN = { x:0, y:1.6, z:4, yaw:0, pitch:0 };
+  // Real-world position/footprint per furniture item, filled in from the
+  // loaded model (wireLoadedFurniture()) — drives the minimap dots.
+  var furnitureRuntime = {};
 
   // per-furniture organizing progress (0–100), demo only — a real build
   // would load/save this per user alongside the visitor-count API above.
@@ -1675,10 +1773,15 @@
     ]
   };
 
-  var SWIPE_DECK_SIZE = 12; // demo deck length per zone; wire to a real inventory count later
-  var FILLER_KEEP = [20, 35, 50, 65, 80];
-  var FILLER_HOLD = ['半年', '1年', '2年', '3年', '5年'];
-  var FILLER_DESC = '某年代某某商場特價購買，因為是跟朋友一起挑選，所以意義重大，沒有考慮是不是真的適合自己。';
+  var SWIPE_DECK_SIZE = 15; // demo deck length per zone; wire to a real inventory count later
+  var FILLER_KEEP = [20, 35, 50, 65, 80, 45, 90];
+  var FILLER_HOLD = ['半年', '1年', '2年', '3年', '5年', '7年'];
+  var FILLER_DESC = [
+    '某年代某某商場特價購買，因為是跟朋友一起挑選，所以意義重大，沒有考慮是不是真的適合自己。',
+    '網路限定款，當時搶著下單，收到後只穿過一兩次就收起來了。',
+    '朋友送的生日禮物，款式跟自己平常的風格不太搭，一直猶豫要不要留。',
+    '換季大掃除翻出來的，已經不太記得當初為什麼會買。'
+  ];
 
   function buildSwipeDeck(zoneId){
     var base = (DEMO_ITEMS[zoneId] || []).map(function(item){ return Object.assign({}, item); });
@@ -1690,7 +1793,7 @@
         name: 'A牌衣服 #' + (deck.length + 1),
         keep: FILLER_KEEP[n % FILLER_KEEP.length],
         holdTime: FILLER_HOLD[n % FILLER_HOLD.length],
-        desc: FILLER_DESC
+        desc: FILLER_DESC[n % FILLER_DESC.length]
       });
       n++;
     }
@@ -1736,12 +1839,8 @@
     scene.add(sun);
     scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 
-    buildRoom();
-    buildFurniture();
-
     raycaster = new THREE.Raycaster();
     mouseVec = new THREE.Vector2();
-
     clock = new THREE.Clock();
 
     canvas.addEventListener('mousedown', onCanvasMouseDown);
@@ -1752,201 +1851,168 @@
     window.addEventListener('keyup', onRoomKeyUp);
     window.addEventListener('resize', onRoomResize);
 
-    /*
-    // ---------------------------------------------------------------
-    // GLTFLoader placeholder — swap the cube placeholders for room.glb
-    // Uncomment this block once GLTFLoader.js (see the loader script tag
-    // above) and your exported model are both in place.
-    //
-    // Blender export tips for this scene:
-    // - Export as .glb (glTF Binary) with "+Y Up" so it matches Three.js.
-    // - room_shell (walls/floor) is static — no naming requirements
-    //   beyond keeping it out of the furniture hierarchy.
-    // - Each furniture item is one PARENT mesh named per parentName in
-    //   FURNITURE_CONFIG ("Desk", "Large_wardrobe", "Wardrobe",
-    //   "Low_cabinet", "Long_cabinet", "Multi-tier_cabinet", "Bed").
-    //   This file raycasts against the parent (recursively, so its
-    //   child parts count too) — that's the single click/hover hotspot
-    //   for the whole item.
-    // - Each moving part (drawer/door/lid) is a CHILD of that parent,
-    //   named per children[].name ("Desk_drawer_01", "Desk_drawer_02",
-    //   "Large_wardrobe_door_01", ...). If a part is itself built from
-    //   several pieces in Blender, join them (Ctrl+J) into that one
-    //   named child before exporting — one child object per moving part.
-    // - Each child's "open" animation action is named per
-    //   children[].action ("Desk_drawer_01_open", ...) so it can be
-    //   looked up by name instead of guessing from clip order.
-    // ---------------------------------------------------------------
-    // var gltfLoader = new THREE.GLTFLoader();
-    // gltfLoader.load('./assets/models/room.glb', function (gltf) {
-    //   scene.add(gltf.scene);
-    //   furnitureGroup.visible = false; // hide the placeholder cubes
-    //
-    //   // Re-point furnitureMeshes at the real named parents, and wire
-    //   // each child's named clip to the same play/reverse calls that
-    //   // setHover() already uses via mesh.userData.actions — no other
-    //   // logic needs to change.
-    //   furnitureMeshes.length = 0;
-    //   mixers.length = 0;
-    //   FURNITURE_CONFIG.forEach(function (cfg) {
-    //     var parentObj = gltf.scene.getObjectByName(cfg.parentName);
-    //     if (!parentObj) return;
-    //     parentObj.userData = {
-    //       id: cfg.id, label: cfg.label,
-    //       outline: parentObj.userData.outline,
-    //       actions: []
-    //     };
-    //     furnitureMeshes.push(parentObj);
-    //
-    //     (cfg.children || []).forEach(function (childCfg) {
-    //       var childObj = gltf.scene.getObjectByName(childCfg.name);
-    //       var clip = THREE.AnimationClip.findByName(gltf.animations, childCfg.action);
-    //       if (!childObj || !clip) return;
-    //       var mixer = new THREE.AnimationMixer(childObj);
-    //       var action = mixer.clipAction(clip);
-    //       action.loop = THREE.LoopOnce;
-    //       action.clampWhenFinished = true;
-    //       parentObj.userData.actions.push(action);
-    //       mixers.push(mixer);
-    //     });
-    //   });
-    // }, undefined, function (error) {
-    //   console.error('room.glb failed to load', error);
-    // });
-    */
+    loadRoomModel();
   }
 
-  function buildRoom(){
-    // Static, non-interactive geometry — matches the "room_shell" entry
-    // in the Blender naming spec (no raycasting/animation on this group).
-    var shell = new THREE.Group();
-    shell.name = 'room_shell';
-    scene.add(shell);
+  /* ================================================================
+     GLTFLoader pipeline — loads ./assets/models/room.glb, then wires
+     furniture raycasting/animation, an authored spawn camera, any
+     leftover animation clips, and real room bounds from its geometry.
+     ================================================================ */
+  var ROOM_MODEL_PATH = './assets/models/room.glb';
 
-    var floorGeo = new THREE.PlaneGeometry(16, 18);
-    var floorMat = new THREE.MeshStandardMaterial({ color: 0x5c3a26, roughness: 0.9 });
-    var floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(0, 0, -0.6);
-    shell.add(floor);
-
-    var grid = new THREE.GridHelper(18, 18, 0x2b1a10, 0x2b1a10);
-    grid.position.set(0, 0.01, -0.6);
-    grid.material.opacity = 0.18;
-    grid.material.transparent = true;
-    shell.add(grid);
-
-    var wallMat = new THREE.MeshStandardMaterial({ color: 0xefe7d8, roughness: 1 });
-    var wallH = 5.5;
-
-    var backWall = new THREE.Mesh(new THREE.PlaneGeometry(16, wallH), wallMat);
-    backWall.position.set(0, wallH / 2, -9.6);
-    shell.add(backWall);
-
-    var leftWall = new THREE.Mesh(new THREE.PlaneGeometry(18, wallH), wallMat);
-    leftWall.rotation.y = Math.PI / 2;
-    leftWall.position.set(-8, wallH / 2, -0.6);
-    shell.add(leftWall);
-
-    var rightWall = new THREE.Mesh(new THREE.PlaneGeometry(18, wallH), wallMat);
-    rightWall.rotation.y = -Math.PI / 2;
-    rightWall.position.set(8, wallH / 2, -0.6);
-    shell.add(rightWall);
-
-    // front wall with a doorway gap in the middle
-    var frontLeft = new THREE.Mesh(new THREE.PlaneGeometry(5.4, wallH), wallMat);
-    frontLeft.rotation.y = Math.PI;
-    frontLeft.position.set(-5.3, wallH / 2, 8.4);
-    shell.add(frontLeft);
-
-    var frontRight = new THREE.Mesh(new THREE.PlaneGeometry(5.4, wallH), wallMat);
-    frontRight.rotation.y = Math.PI;
-    frontRight.position.set(5.3, wallH / 2, 8.4);
-    shell.add(frontRight);
-
-    var lintel = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2), wallMat);
-    lintel.rotation.y = Math.PI;
-    lintel.position.set(0, wallH - 1, 8.4);
-    shell.add(lintel);
+  function showRoomLoading(visible, percent){
+    var el = document.getElementById('roomLoading');
+    if (!el) return;
+    el.classList.toggle('visible', !!visible);
+    if (visible){
+      var pctEl = document.getElementById('roomLoadingPercent');
+      if (pctEl) pctEl.textContent = (percent || 0) + '%';
+    }
+  }
+  function showRoomLoadError(){
+    var el = document.getElementById('roomLoadError');
+    if (el) el.classList.add('visible');
+  }
+  function hideRoomLoadError(){
+    var el = document.getElementById('roomLoadError');
+    if (el) el.classList.remove('visible');
+  }
+  var roomLoadRetryBtn = document.getElementById('roomLoadRetryBtn');
+  if (roomLoadRetryBtn){
+    roomLoadRetryBtn.addEventListener('click', function(){ loadRoomModel(); });
   }
 
-  var furnitureGroup;
-  function buildFurniture(){
-    furnitureGroup = new THREE.Group();
-    scene.add(furnitureGroup);
+  function loadRoomModel(){
+    showRoomLoading(true, 0);
+    hideRoomLoadError();
+
+    var loader = new THREE.GLTFLoader();
+    loader.load(
+      ROOM_MODEL_PATH,
+      function onLoad(gltf){
+        scene.add(gltf.scene);
+        wireLoadedFurniture(gltf);
+        wireDefaultCamera(gltf);
+        wireModelAnimations(gltf);
+        computeRoomBounds(gltf.scene);
+        showRoomLoading(false);
+        if (roomActive) resetCamera(); // snap to the authored view if already inside
+      },
+      function onProgress(xhr){
+        if (xhr.lengthComputable){
+          showRoomLoading(true, Math.round((xhr.loaded / xhr.total) * 100));
+        }
+      },
+      function onError(error){
+        console.error('room.glb 載入失敗（路徑：' + ROOM_MODEL_PATH + '）', error);
+        showRoomLoading(false);
+        showRoomLoadError();
+      }
+    );
+  }
+
+  // Points furnitureMeshes at the real named parent objects from the
+  // loaded model, and wires each named child part's named animation
+  // clip into an AnimationMixer — this is the only place that needs to
+  // change if your Blender naming ever drifts from FURNITURE_CONFIG.
+  function wireLoadedFurniture(gltf){
+    furnitureMeshes.length = 0;
+    mixers.length = 0;
 
     FURNITURE_CONFIG.forEach(function(cfg){
-      var geo = new THREE.BoxGeometry(cfg.size[0], cfg.size[1], cfg.size[2]);
-      var mat = new THREE.MeshStandardMaterial({
-        color: cfg.color,
-        roughness: 0.6,
-        emissive: 0x000000,
-        emissiveIntensity: 0
-      });
-      var mesh = new THREE.Mesh(geo, mat);
-      mesh.name = cfg.parentName; // matches the Blender naming spec (see chat)
-      mesh.position.set(cfg.pos[0], cfg.pos[1], cfg.pos[2]);
-      mesh.userData = { id: cfg.id, label: cfg.label, baseColor: cfg.color, actions: [] };
+      var parentObj = gltf.scene.getObjectByName(cfg.parentName);
+      if (!parentObj){
+        console.warn('room.glb 裡找不到家具主物件："' + cfg.parentName + '"');
+        return;
+      }
 
-      var outlineGeo = new THREE.EdgesGeometry(geo);
-      var outline = new THREE.LineSegments(outlineGeo, new THREE.LineBasicMaterial({ color: 0xfff6e0, linewidth: 2 }));
-      outline.scale.set(1.04, 1.04, 1.04);
+      // hover highlight needs every real mesh under this parent (it may
+      // be a single joined mesh, or a group of several) — collect them
+      // once here rather than assuming parentObj.material exists.
+      var meshes = [];
+      parentObj.traverse(function(o){ if (o.isMesh) meshes.push(o); });
+
+      var box = new THREE.Box3().setFromObject(parentObj);
+      var size = new THREE.Vector3(); box.getSize(size);
+      var center = new THREE.Vector3(); box.getCenter(center);
+
+      var outline = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(size.x, size.y, size.z)),
+        new THREE.LineBasicMaterial({ color: 0xfff6e0, linewidth: 2 })
+      );
+      outline.position.copy(parentObj.worldToLocal(center.clone()));
       outline.visible = false;
-      mesh.add(outline);
-      mesh.userData.outline = outline;
+      parentObj.add(outline);
 
-      buildFurnitureChildren(mesh, cfg);
+      parentObj.userData = { id: cfg.id, label: cfg.label, meshes: meshes, outline: outline, actions: [] };
+      furnitureMeshes.push(parentObj);
+      furnitureRuntime[cfg.id] = { pos: [center.x, center.y, center.z], size: [size.x, size.z] };
 
-      furnitureGroup.add(mesh);
-      furnitureMeshes.push(mesh);
+      (cfg.children || []).forEach(function(childCfg){
+        var childObj = gltf.scene.getObjectByName(childCfg.name);
+        var clip = THREE.AnimationClip.findByName(gltf.animations || [], childCfg.action);
+        if (!childObj){
+          console.warn('room.glb 裡找不到動畫部件："' + childCfg.name + '"');
+          return;
+        }
+        if (!clip){
+          console.warn('room.glb 裡找不到動畫 Action："' + childCfg.action + '"');
+          return;
+        }
+        var mixer = new THREE.AnimationMixer(childObj);
+        var action = mixer.clipAction(clip);
+        action.loop = THREE.LoopOnce;
+        action.clampWhenFinished = true;
+        parentObj.userData.actions.push(action);
+        mixers.push(mixer);
+      });
     });
   }
 
-  // ------------------------------------------------------------------
-  // Build each furniture's animated sub-parts (drawers/doors/lids) as
-  // named children of the parent mesh, each with its own procedural
-  // "open" clip. This is a placeholder: once room.glb ships with real
-  // clips named per child.action (see FURNITURE_CONFIG), swap the body
-  // of this function for AnimationClip.findByName(gltf.animations,
-  // child.action) per child — setHover()/playFurnitureActions() below
-  // don't need to change since they just iterate mesh.userData.actions.
-  // ------------------------------------------------------------------
-  function buildFurnitureChildren(parentMesh, cfg){
-    (cfg.children || []).forEach(function(childCfg){
-      var geo = new THREE.BoxGeometry(childCfg.size[0], childCfg.size[1], childCfg.size[2]);
-      var mat = new THREE.MeshStandardMaterial({ color: cfg.color, roughness: 0.5, metalness: 0.05 });
-      var child = new THREE.Mesh(geo, mat);
-      child.name = childCfg.name; // matches the Blender naming spec (see chat)
-      child.position.set(childCfg.local[0], childCfg.local[1], childCfg.local[2]);
-      parentMesh.add(child);
+  // If the model has a camera/empty named "DefaultCamera", use its
+  // authored transform as the player's spawn point instead of the
+  // generic fallback.
+  function wireDefaultCamera(gltf){
+    var defaultCam = gltf.scene.getObjectByName('DefaultCamera');
+    if (!defaultCam) return;
 
-      var duration = 0.55;
-      var startPos = child.position.toArray();
-      var startRot = [child.rotation.x, child.rotation.y, child.rotation.z];
-      var track;
+    var worldPos = new THREE.Vector3();
+    defaultCam.getWorldPosition(worldPos);
+    var worldQuat = new THREE.Quaternion();
+    defaultCam.getWorldQuaternion(worldQuat);
+    var euler = new THREE.Euler().setFromQuaternion(worldQuat, 'YXZ');
 
-      if (childCfg.type === 'slideX'){
-        var endPosX = [startPos[0] + (childCfg.dir || 1) * 0.34, startPos[1], startPos[2]];
-        track = new THREE.VectorKeyframeTrack('.position', [0, duration], startPos.concat(endPosX));
-      } else if (childCfg.type === 'lidRotate'){
-        var endRot = [startRot[0] - 0.9, startRot[1], startRot[2]]; // hinge open ~50°
-        var q0 = new THREE.Quaternion().setFromEuler(new THREE.Euler(startRot[0], startRot[1], startRot[2]));
-        var q1 = new THREE.Quaternion().setFromEuler(new THREE.Euler(endRot[0], endRot[1], endRot[2]));
-        track = new THREE.QuaternionKeyframeTrack('.quaternion', [0, duration], [q0.x,q0.y,q0.z,q0.w, q1.x,q1.y,q1.z,q1.w]);
-      } else { // 'slideZ' default — drawer pulling toward the player
-        var endPosZ = [startPos[0], startPos[1], startPos[2] + 0.34];
-        track = new THREE.VectorKeyframeTrack('.position', [0, duration], startPos.concat(endPosZ));
-      }
+    DEFAULT_SPAWN = { x: worldPos.x, y: worldPos.y, z: worldPos.z, yaw: euler.y, pitch: euler.x };
+  }
 
-      var clip = new THREE.AnimationClip(childCfg.action, duration, [track]);
-      var mixer = new THREE.AnimationMixer(child);
-      var action = mixer.clipAction(clip);
-      action.loop = THREE.LoopOnce;
-      action.clampWhenFinished = true;
-
-      mixers.push(mixer);
-      parentMesh.userData.actions.push(action);
+  // Any animation clip not already claimed by a furniture child action
+  // (e.g. an ambient/idle animation authored on the whole scene) still
+  // gets bound and played, so nothing baked into the file goes unused.
+  function wireModelAnimations(gltf){
+    if (!gltf.animations || !gltf.animations.length) return;
+    var claimed = {};
+    FURNITURE_CONFIG.forEach(function(cfg){
+      (cfg.children || []).forEach(function(c){ claimed[c.action] = true; });
     });
+    var leftover = gltf.animations.filter(function(clip){ return !claimed[clip.name]; });
+    if (!leftover.length) return;
+
+    var globalMixer = new THREE.AnimationMixer(gltf.scene);
+    leftover.forEach(function(clip){ globalMixer.clipAction(clip).play(); });
+    mixers.push(globalMixer);
+  }
+
+  // Derives real WASD movement bounds from the loaded model's overall
+  // bounding box, replacing the generous placeholder ROOM_BOUNDS.
+  function computeRoomBounds(root){
+    var box = new THREE.Box3().setFromObject(root);
+    if (!isFinite(box.min.x) || !isFinite(box.max.x)) return; // empty/degenerate scene guard
+    var margin = 0.4; // keep the player from clipping through walls
+    ROOM_BOUNDS = {
+      minX: box.min.x + margin, maxX: box.max.x - margin,
+      minZ: box.min.z + margin, maxZ: box.max.z - margin
+    };
   }
 
   function playFurnitureActions(mesh, direction){
@@ -1960,23 +2026,40 @@
   }
 
   function resetCamera(){
-    player.x = 0; player.y = 1.7; player.z = 5.6; player.yaw = 0; player.pitch = 0;
+    player.x = DEFAULT_SPAWN.x; player.y = DEFAULT_SPAWN.y; player.z = DEFAULT_SPAWN.z;
+    player.yaw = DEFAULT_SPAWN.yaw; player.pitch = DEFAULT_SPAWN.pitch;
     camera.position.set(player.x, player.y, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  }
+
+  // Toggles emissive highlight across every real mesh under a furniture
+  // parent (it may be one joined mesh or several) — this is what makes
+  // hover work regardless of how the item was authored in Blender.
+  function setMeshesEmissive(root, on){
+    (root.userData.meshes || []).forEach(function(m){
+      if (!m.material || !m.material.emissive) return;
+      if (on){
+        if (m.userData.origEmissive == null) m.userData.origEmissive = m.material.emissive.getHex();
+        m.material.emissive.setHex(0xfff2c9);
+        m.material.emissiveIntensity = 0.55;
+      } else {
+        m.material.emissive.setHex(m.userData.origEmissive != null ? m.userData.origEmissive : 0x000000);
+        m.material.emissiveIntensity = 0;
+      }
+    });
   }
 
   function setHover(mesh){
     if (hovered === mesh) return;
     if (hovered){
-      hovered.userData.outline.visible = false;
-      hovered.material.emissiveIntensity = 0;
+      setMeshesEmissive(hovered, false);
+      if (hovered.userData.outline) hovered.userData.outline.visible = false;
       playFurnitureActions(hovered, -1); // reverse / close every child part
     }
     hovered = mesh;
     if (hovered){
-      hovered.userData.outline.visible = true;
-      hovered.material.emissive.setHex(0xfff2c9);
-      hovered.material.emissiveIntensity = 0.55;
+      setMeshesEmissive(hovered, true);
+      if (hovered.userData.outline) hovered.userData.outline.visible = true;
       playFurnitureActions(hovered, 1); // play forward / open every child part
     }
   }
@@ -2154,6 +2237,7 @@
     resetCamera();
     setHover(null);
     document.getElementById('roomScene').classList.add('active');
+    document.getElementById('globalHudRight').classList.add('visible');
     roomActive = true;
     if (clock) clock.start();
     cancelAnimationFrame(rafId);
@@ -2164,11 +2248,13 @@
     roomActive = false;
     cancelAnimationFrame(rafId);
     document.getElementById('roomScene').classList.remove('active');
+    document.getElementById('globalHudRight').classList.remove('visible');
     keys = {};
     isDragging = false;
     controlsPaused = false;
     closeFurnitureModal();
     closeStatsModal();
+    if (swipeState) closeSwipeSession();
   }
 
   /* ---------------- Zone progress panel (left side, under minimap) ---------------- */
@@ -2374,21 +2460,24 @@
   var swipeKeepBtn = document.getElementById('swipeKeepBtn');
   var swipeUndoBtn = document.getElementById('swipeUndoBtn');
   var swipeDiscardBtn = document.getElementById('swipeDiscardBtn');
-  var swipeHomeIcon = document.getElementById('swipeHomeIcon');
-  var swipeStatsIcon = document.getElementById('swipeStatsIcon');
-  var swipeChatIcon = document.getElementById('swipeChatIcon');
 
   var swipeState = null; // { zoneId, deck, index, history:[{item,direction}] }
   var cardIconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l4.5-6 3.5 4.5 2.5-3L20 16"/><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>';
   var SLOT_COUNT = 5; // 1 interactive front card + 4 real-content cards stacked behind it
-  var slotEls = []; // persistent DOM nodes, reused/reordered rather than rebuilt each swipe
+  var slotEls = [];   // slotEls[0] is ALWAYS the front card — the single source of
+                       // truth for "what's on top". Only ever reordered via shift/push,
+                       // and only once per completed swipe (see commitSwipe below).
+  var isAnimating = false; // true for the ~400ms a card is flying off-screen; blocks
+                            // every other swipe action so nothing can double-fire.
 
   function openSwipeSession(zoneId){
     var cfg = FURNITURE_CONFIG.find(function(c){ return c.id === zoneId; });
     if (!cfg) return;
     swipeState = { zoneId: zoneId, deck: buildSwipeDeck(zoneId), index: 0, history: [] };
+    isAnimating = false;
     swipeZoneNameEl.textContent = cfg.label;
     controlsPaused = true; // pause WASD + mouse-look while swiping
+    swipeScene.classList.remove('finished');
     swipeScene.classList.add('active');
     initSwipeSlots();
     updateSwipeProgress();
@@ -2398,6 +2487,7 @@
     swipeScene.classList.remove('active');
     swipeCardStackEl.innerHTML = '';
     slotEls = [];
+    isAnimating = false;
     controlsPaused = false;
     swipeState = null;
   }
@@ -2416,13 +2506,23 @@
     return cfg ? '#' + cfg.color.toString(16).padStart(6, '0') : '#cccccc';
   }
 
+  // Native disabled state (not just a no-op guard) so the buttons can
+  // never be clicked into an undefined state at the deck boundaries or
+  // while a card is mid-flight.
+  function updateActionButtons(){
+    var hasCard = !!swipeState && swipeState.index < swipeState.deck.length;
+    var busy = isAnimating;
+    swipeKeepBtn.disabled = !hasCard || busy;
+    swipeDiscardBtn.disabled = !hasCard || busy;
+    swipeUndoBtn.disabled = !swipeState || !swipeState.history.length || busy;
+  }
+
   // Build the fixed pool of card elements once per session. Each one stays
   // in the DOM for the whole session — swiping only changes which "slot"
-  // class (and therefore scale/offset/z-index) an element wears and, for
-  // the one being recycled from front to back, its content. Because the
-  // real image/name is always rendered (never a gray placeholder), the
-  // next card is fully visible and legible the moment the current one
-  // starts moving away.
+  // class (scale/offset/z-index) an element wears and, for the one being
+  // recycled from front to back, its content. Real content is always
+  // rendered (never a gray placeholder), so the next card is fully
+  // legible the moment the current one starts moving away.
   function initSwipeSlots(){
     swipeCardStackEl.innerHTML = '';
     slotEls = [];
@@ -2441,12 +2541,7 @@
       swipeCardStackEl.appendChild(card);
       slotEls.push(card);
     }
-    applySlotPositions();
-    // let the initial layout apply instantly, then re-enable transitions
-    void swipeCardStackEl.offsetWidth;
-    requestAnimationFrame(function(){
-      slotEls.forEach(function(el){ el.classList.remove('no-anim'); });
-    });
+    layoutSlots(true);
   }
 
   function fillCardContent(el, item, hex){
@@ -2455,42 +2550,74 @@
     el.querySelector('.swipe-card-header h3').textContent = item.name;
     el.querySelector('.hold-tag').textContent = item.holdTime;
     el.querySelector('.swipe-card-desc').textContent = item.desc;
+    // Always force the keep/discard overlay back to invisible — without
+    // this, a recycled card can carry a stale drag-overlay opacity from
+    // an earlier gesture and flash red/green before the user touches it.
+    el.querySelector('.keep-overlay').style.opacity = 0;
+    el.querySelector('.discard-overlay').style.opacity = 0;
   }
 
-  // Applies slotEls[i] → visual position i (front = 0). Only content for
-  // elements whose underlying deck item actually changed gets rewritten;
-  // everything else just gets a new position class, which is what the
-  // CSS transition animates (the "promote to front" grow/rise effect).
-  function applySlotPositions(){
+  // el → visual position i (0 = front). Content is recomputed from the
+  // deck every time (cheap — a handful of text/style writes), so the
+  // deck-index ↔ DOM-element mapping can never drift out of sync.
+  function setSlotPosition(el, i){
     if (!swipeState) return;
     var deck = swipeState.deck;
     var hex = cardHex(swipeState.zoneId);
-    slotEls.forEach(function(el, i){
-      el.classList.remove('swipe-slot-0','swipe-slot-1','swipe-slot-2','swipe-slot-3','swipe-slot-4','swipe-slot-hidden');
-      var idx = swipeState.index + i;
-      if (idx < deck.length){
-        fillCardContent(el, deck[idx], hex);
-        el.classList.add('swipe-slot-' + i);
-        el.dataset.slot = String(i);
-      } else {
-        el.classList.add('swipe-slot-hidden');
-        el.dataset.slot = 'hidden';
-      }
-    });
+    el.classList.remove('swipe-slot-0','swipe-slot-1','swipe-slot-2','swipe-slot-3','swipe-slot-4','swipe-slot-hidden');
+    var idx = swipeState.index + i;
+    if (idx < deck.length){
+      fillCardContent(el, deck[idx], hex);
+      el.classList.add('swipe-slot-' + i);
+    } else {
+      el.classList.add('swipe-slot-hidden');
+    }
+  }
+
+  // Re-lays out the whole stack from the current slotEls order + index.
+  // instant=true skips the CSS transition (used on session start / undo
+  // so nothing appears to fly in from an old position).
+  function layoutSlots(instant){
+    if (!swipeState) return;
+    if (instant) slotEls.forEach(function(el){ el.classList.add('no-anim'); });
+    try {
+      slotEls.forEach(function(el, i){ setSlotPosition(el, i); });
+    } catch (err) {
+      console.error('layoutSlots failed', err);
+    }
+    if (instant){
+      void swipeCardStackEl.offsetWidth; // force reflow before re-enabling transitions
+      requestAnimationFrame(function(){
+        slotEls.forEach(function(el){ el.classList.remove('no-anim'); });
+      });
+    }
+    updateActionButtons();
   }
 
   function attachSwipeDrag(card){
-    var startX = 0, startY = 0, dx = 0, isDown = false;
+    var startX = 0, startY = 0, dx = 0, isDown = false, pointerId = null;
     var keepOverlay = card.querySelector('.keep-overlay');
     var discardOverlay = card.querySelector('.discard-overlay');
     var THRESHOLD = 110;
 
+    function isFrontCard(){ return slotEls[0] === card; }
+
+    function resetVisual(){
+      card.classList.remove('dragging');
+      card.style.transform = '';
+      keepOverlay.style.opacity = 0;
+      discardOverlay.style.opacity = 0;
+    }
+
     function onDown(e){
-      if (card.dataset.slot !== '0') return; // only the front card responds
+      if (isAnimating || !isFrontCard()) return;
       isDown = true; dx = 0;
       startX = e.clientX; startY = e.clientY;
+      pointerId = e.pointerId;
       card.classList.add('dragging');
-      if (card.setPointerCapture && e.pointerId != null) card.setPointerCapture(e.pointerId);
+      if (card.setPointerCapture && pointerId != null){
+        try { card.setPointerCapture(pointerId); } catch (err) { /* no-op */ }
+      }
     }
     function onMove(e){
       if (!isDown) return;
@@ -2502,73 +2629,132 @@
       if (dx < 0){ keepOverlay.style.opacity = ratio; discardOverlay.style.opacity = 0; }
       else { discardOverlay.style.opacity = ratio; keepOverlay.style.opacity = 0; }
     }
+    function releaseCapture(){
+      if (card.releasePointerCapture && pointerId != null){
+        try { card.releasePointerCapture(pointerId); } catch (err) { /* no-op */ }
+      }
+      pointerId = null;
+    }
     function onUp(){
       if (!isDown) return;
       isDown = false;
-      card.classList.remove('dragging');
-      if (Math.abs(dx) > THRESHOLD){
-        commitSwipe(dx < 0 ? 'keep' : 'discard');
+      releaseCapture();
+      var finalDx = dx;
+      dx = 0;
+      if (Math.abs(finalDx) > THRESHOLD && !isAnimating){
+        card.classList.remove('dragging');
+        commitSwipe(finalDx < 0 ? 'keep' : 'discard');
       } else {
-        card.style.transform = '';
-        keepOverlay.style.opacity = 0;
-        discardOverlay.style.opacity = 0;
+        resetVisual();
       }
+    }
+    // A cancelled pointer (browser gesture interrupt, etc.) must always
+    // just reset — never commit a swipe, unlike a normal pointerup.
+    function onCancel(){
+      if (!isDown) return;
+      isDown = false;
+      dx = 0;
+      releaseCapture();
+      resetVisual();
     }
 
     card.addEventListener('pointerdown', onDown);
     card.addEventListener('pointermove', onMove);
     card.addEventListener('pointerup', onUp);
-    card.addEventListener('pointercancel', onUp);
+    card.addEventListener('pointercancel', onCancel);
   }
 
   function commitSwipe(direction){
-    if (!swipeState || !slotEls.length) return;
-    var deck = swipeState.deck;
-    var item = deck[swipeState.index];
+    if (isAnimating || !swipeState) return;
+    var item = swipeState.deck[swipeState.index];
     if (!item) return;
 
-    var flownEl = slotEls[0];
-    var flyX = direction === 'keep' ? -window.innerWidth : window.innerWidth;
-    flownEl.classList.add('fly-out');
-    flownEl.style.transform = 'translate(' + flyX + 'px, 40px) rotate(' + (direction === 'keep' ? -24 : 24) + 'deg)';
+    isAnimating = true;
+    updateActionButtons();
 
-    // the rest of the stack promotes forward immediately — real content is
-    // already on those cards, so this alone gives the "next card grows
-    // into place" transition while the front card is still flying off.
-    slotEls.shift();
-    slotEls.push(flownEl);
-    swipeState.history.push({ item: item, direction: direction });
-    swipeState.index++;
-    updateSwipeProgress();
-    applySlotPositions();
+    // Captured now, not read again later — if the user closes/reopens the
+    // swipe session while this card is still mid-flight, the stale timeout
+    // below detects the mismatch and bails out instead of corrupting the
+    // new session's slotEls/index.
+    var session = swipeState;
+    var flownEl = slotEls[0];
+
+    try {
+      flownEl.classList.remove('swipe-slot-0');
+      flownEl.style.zIndex = 60; // stay above the rest while it flies out
+      flownEl.classList.add('fly-out');
+      var flyX = direction === 'keep' ? -window.innerWidth : window.innerWidth;
+      flownEl.style.transform = 'translate(' + flyX + 'px, 40px) rotate(' + (direction === 'keep' ? -24 : 24) + 'deg)';
+
+      session.history.push({ item: item, direction: direction });
+      session.index++;
+      updateSwipeProgress();
+
+      // Promote the remaining cards immediately — real content is already
+      // on them, so this alone gives the "grow toward front" transition
+      // while the front card is still mid-flight in the background.
+      slotEls.slice(1).forEach(function(el, i){ setSlotPosition(el, i); });
+    } catch (err) {
+      console.error('commitSwipe (start) failed, releasing lock', err);
+      isAnimating = false;
+      updateActionButtons();
+      return;
+    }
+
+    // Last-resort watchdog: if anything ever prevents the recycle step
+    // below from completing (an unforeseen exception, a tab throttling
+    // timers, etc.), this guarantees the UI un-freezes on its own rather
+    // than staying disabled forever.
+    var watchdog = setTimeout(function(){
+      if (swipeState !== session || !isAnimating) return;
+      console.warn('swipe recycle watchdog fired — forcing the lock open');
+      isAnimating = false;
+      updateActionButtons();
+    }, 1500);
 
     setTimeout(function(){
-      if (!swipeState) return;
-      // recycle the flown-out card into the new back slot without it
-      // visibly flying back in — snap it into place, then re-enable
-      // transitions on the next frame.
-      flownEl.classList.add('no-anim');
-      flownEl.classList.remove('fly-out');
-      flownEl.style.transform = '';
-      applySlotPositions(); // refresh in case index moved again (e.g. fast swipes)
-      void flownEl.offsetWidth;
-      requestAnimationFrame(function(){ flownEl.classList.remove('no-anim'); });
+      clearTimeout(watchdog);
+      if (swipeState !== session){
+        // session changed mid-flight — don't touch its (now unrelated) state
+        isAnimating = false;
+        return;
+      }
+      try {
+        // Recycle: now that it's safely off-screen, snap it into the back
+        // slot with fresh content and no visible transition.
+        flownEl.classList.add('no-anim');
+        flownEl.classList.remove('fly-out');
+        flownEl.style.transform = '';
+        flownEl.style.zIndex = '';
+        slotEls.shift();
+        slotEls.push(flownEl);
+        setSlotPosition(flownEl, SLOT_COUNT - 1);
+        void flownEl.offsetWidth;
+        requestAnimationFrame(function(){ flownEl.classList.remove('no-anim'); });
+      } catch (err) {
+        console.error('commitSwipe (recycle) failed', err);
+      } finally {
+        // Always releases the lock, no matter what happened above —
+        // this is the fix for the card 6/7, 11/12 freeze.
+        isAnimating = false;
+        updateActionButtons();
+      }
 
-      if (swipeState.index >= deck.length) showSwipeSummary();
+      if (session.index >= session.deck.length) showSwipeSummary();
     }, 400);
   }
 
   function triggerButtonSwipe(direction){
-    if (!swipeState || swipeState.index >= swipeState.deck.length) return;
+    if (isAnimating || !swipeState || swipeState.index >= swipeState.deck.length) return;
     commitSwipe(direction);
   }
 
   function undoSwipe(){
-    if (!swipeState || !swipeState.history.length) return;
+    if (isAnimating || !swipeState || !swipeState.history.length) return;
     swipeState.history.pop();
-    swipeState.index--;
+    swipeState.index = Math.max(0, swipeState.index - 1);
     updateSwipeProgress();
-    applySlotPositions();
+    layoutSlots(false);
   }
 
   swipeKeepBtn.addEventListener('click', function(){ triggerButtonSwipe('keep'); });
@@ -2583,25 +2769,6 @@
       cancelText:'繼續整理',
       onConfirm: function(){ closeSwipeSession(); }
     });
-  });
-
-  swipeHomeIcon.addEventListener('click', function(e){
-    var x = e.clientX, y = e.clientY;
-    openConfirmDialog({
-      title:'確定要回到主頁嗎？',
-      desc:'目前的篩選進度將會儲存。',
-      confirmText:'回到主頁',
-      cancelText:'取消',
-      onConfirm: function(){
-        closeSwipeSession();
-        handleGoHome({ clientX: x, clientY: y });
-      }
-    });
-  });
-
-  swipeStatsIcon.addEventListener('click', openStatsModal);
-  swipeChatIcon.addEventListener('click', function(){
-    showToast('留言區即將推出，敬請期待 💬');
   });
 
   /* ---------------- Zone completion summary ---------------- */
@@ -2640,10 +2807,12 @@
     summaryDescEl.textContent = desc;
     summaryKeepCountEl.textContent = keepCount;
     summaryDiscardCountEl.textContent = discardCount;
+    swipeScene.classList.add('finished'); // hides the (now empty) card stack + action bar
     summaryModalOverlay.classList.add('active');
   }
   function closeSwipeSummary(){
     summaryModalOverlay.classList.remove('active');
+    swipeScene.classList.remove('finished');
   }
   summaryRetryBtn.addEventListener('click', function(){
     if (!swipeState) return;
@@ -2661,9 +2830,10 @@
     closeSwipeSession();
     showToast('『' + (cfg ? cfg.label : '') + '』整理完成，已標記為已整理 100% ✅');
   });
-  summaryModalOverlay.addEventListener('click', function(e){
-    if (e.target === summaryModalOverlay) closeSwipeSummary();
-  });
+  // Deliberately no backdrop-click-to-dismiss here: once a zone is fully
+  // sorted, only the 3 explicit controls (X, retry, done) should be able
+  // to move the user forward — an accidental outside click shouldn't
+  // leave them stranded on an empty stack with no summary either.
 
   /* ---------------- Message board icon (room scene) ---------------- */
   document.getElementById('chatIcon').addEventListener('click', function(){
