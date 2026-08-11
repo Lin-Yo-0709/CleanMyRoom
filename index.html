@@ -182,7 +182,7 @@
     border-radius: 6px 6px 2px 2px;
     box-shadow: inset 0 0 0 3px rgba(0,0,0,0.15), inset 0 4px 10px rgba(255,255,255,0.15);
     transform-origin: left center;
-    transition: transform .85s cubic-bezier(.68,-0.2,.27,1.15);
+    transition: transform .85s cubic-bezier(.68,-0.2,.27,1.15), filter .25s ease;
     overflow:hidden;
   }
   .door::before{
@@ -239,7 +239,14 @@
     50%{ box-shadow: 0 6px 3px -3px #1a0f09, 0 0 14px 3px rgba(255,214,120,1); }
   }
 
-  .door-wrap:hover .door{ transform: rotateY(-4deg) translateX(1px); }
+  /* Simple on purpose: no transform/rotateY here. The door used to tilt
+     a few degrees on hover, but ANY rotateY inside .door-frame's
+     preserve-3d context forces the browser to recompute 3D compositing
+     order every time hover starts/stops — that recompute is what
+     produced the black flash (against the dark ::after "interior"
+     behind it) on both mouse-enter AND mouse-leave. A plain filter
+     change never touches 3D compositing, so this can't flicker. */
+  .door-wrap:hover .door{ filter: brightness(1.06); }
 
   .door-frame::after{
     /* This is the dark "interior" revealed behind the door as it swings
@@ -727,6 +734,9 @@
     position:relative; /* anchor for the absolutely-positioned slider below */
     display:flex;
     align-items:center;
+    justify-content:center;
+    width:46px;   /* matches .hud-icon exactly, so the 4 icons align pixel-for-pixel */
+    flex-shrink:0;
   }
   #landingAudioPanel{
     position:fixed;
@@ -810,6 +820,7 @@
 
   @media (max-width: 720px){
     #landingAudioPanel{ top:16px; right:16px; }
+    .audio-panel{ width:38px; }
     .audio-toggle-btn{ width:38px; height:38px; }
     .audio-toggle-btn svg{ width:16px; height:16px; }
     .audio-slider-wrap.expanded{ width:96px; }
@@ -1568,7 +1579,7 @@
   ------------------------------------------------------------------- */
   var AudioManager = (function(){
     var sfxClick = new Audio('./assets/sfx/ui-pop.mp3');
-    var sfxDiscard = new Audio('./assets/bgm/leave.mp3'); // "丟掉" gets its own distinct cue, never stacked with ui-pop
+    var sfxDiscard = new Audio('./assets/sfx/leave.mp3'); // "丟掉" gets its own distinct cue, never stacked with ui-pop
     var bgmLanding = new Audio('./assets/bgm/open-rap.mp3');
     var bgmRoom = new Audio('./assets/bgm/room-vibe.mp3');
     bgmLanding.loop = true;
@@ -1687,6 +1698,13 @@
       if (state.unlocked) return;
       state.unlocked = true;
       startLanding();
+      // Warm up room-vibe.mp3 too, on this same first real gesture —
+      // whatever it turns out to be. This is deliberately redundant with
+      // primeRoomBGM() being called again from the confirm button: two
+      // independent chances for a real play() call to land inside a
+      // trusted gesture, since some browsers (Safari especially) are
+      // strict about this and any single missed call means silence.
+      primeRoomBGM();
     }
     document.addEventListener('pointerdown', unlock, { once: true, passive: true });
     window.addEventListener('load', startLanding);
@@ -2175,7 +2193,7 @@
   var cameraTween = null;
 
   var velocity = null; // THREE.Vector3, persists across frames for movement damping
-  var MOVE_MAX_SPEED = 2.8;  // world units/sec — slower, more comfortable base speed
+  var MOVE_MAX_SPEED = 2.3;  // world units/sec — slower, more comfortable base speed
   var MOVE_ACCEL = 10;       // how quickly velocity ramps up while a key is held
   var MOVE_DECEL = 5;        // how quickly it glides to a stop after release (inertia)
 
