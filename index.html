@@ -711,6 +711,86 @@
   .hud-icon:hover{ transform: translateY(-2px) scale(1.04); background: var(--gold); }
   .hud-icon:active{ transform: translateY(0) scale(0.98); }
 
+  /* -------- Audio panel (BGM/SFX volume + mute) -------- */
+  .audio-panel{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .audio-panel-room{ justify-content:flex-end; }
+  #landingAudioPanel{
+    position:fixed;
+    top:24px; right:24px;
+    z-index:70;
+    justify-content:flex-end;
+  }
+  .audio-toggle-btn{
+    flex-shrink:0;
+    width:46px; height:46px;
+    border-radius:50%;
+    border:none;
+    background: var(--paper);
+    color: var(--ink);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    box-shadow: var(--shadow);
+    transition: transform .15s ease, background .15s ease;
+  }
+  .audio-toggle-btn:hover{ transform: translateY(-2px) scale(1.04); background: var(--gold); }
+  .audio-toggle-btn:active{ transform: translateY(0) scale(0.98); }
+  .audio-toggle-btn svg{ width:20px; height:20px; }
+  .audio-toggle-btn .icon-muted{ display:none; }
+  .audio-toggle-btn.muted .icon-note{ display:none; }
+  .audio-toggle-btn.muted .icon-muted{ display:block; }
+
+  /* hidden by default ("可調式旋鈕，平時不出現") — revealed on toggle click */
+  .audio-slider-wrap{
+    width:0;
+    overflow:hidden;
+    opacity:0;
+    transition: width .22s ease, opacity .18s ease;
+  }
+  .audio-slider-wrap.expanded{
+    width:110px;
+    opacity:1;
+  }
+  .audio-slider{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100px;
+    height:4px;
+    margin:0 6px;
+    border-radius:999px;
+    background: rgba(43,35,28,0.18);
+    outline:none;
+  }
+  .audio-slider::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px; height:16px;
+    border-radius:50%;
+    background: var(--paper);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+    cursor:pointer;
+  }
+  .audio-slider::-moz-range-thumb{
+    width:16px; height:16px;
+    border:none;
+    border-radius:50%;
+    background: var(--paper);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+    cursor:pointer;
+  }
+
+  @media (max-width: 720px){
+    #landingAudioPanel{ top:16px; right:16px; }
+    .audio-toggle-btn{ width:38px; height:38px; }
+    .audio-toggle-btn svg{ width:16px; height:16px; }
+    .audio-slider-wrap.expanded{ width:80px; }
+    .audio-slider{ width:70px; }
+  }
+
   .controls-hint{
     position:absolute;
     bottom:24px; left:24px;
@@ -724,17 +804,36 @@
     padding:14px 16px;
     border-radius:14px;
   }
-  .controls-hint .key-row{ display:flex; gap:6px; }
+  .controls-hint .wasd-grid{
+    display:grid;
+    grid-template-columns: repeat(3, 30px);
+    grid-template-rows: repeat(2, 30px);
+    gap:6px;
+  }
   .controls-hint .key{
     width:30px; height:30px;
     display:flex; align-items:center; justify-content:center;
     background: var(--paper);
+    border:none;
     border-radius:7px;
     font-weight:800;
     font-size:13px;
+    font-family:"Noto Sans TC",sans-serif;
     color: var(--ink);
     box-shadow: 0 3px 0 rgba(0,0,0,0.3);
+    cursor:default;
   }
+  .controls-hint button.key{
+    cursor:pointer;
+    transition: transform .12s ease;
+  }
+  .controls-hint button.key:hover{ transform: translateY(-1px); }
+  .controls-hint button.key:active{ transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
+  .key-w{ grid-column:2; grid-row:1; }
+  .key-r{ grid-column:3; grid-row:1; color: var(--coral-deep); }
+  .key-a{ grid-column:1; grid-row:2; }
+  .key-s{ grid-column:2; grid-row:2; }
+  .key-d{ grid-column:3; grid-row:2; }
   .controls-hint p{
     margin:6px 0 0;
     font-size:11.5px;
@@ -1128,6 +1227,15 @@
 <body>
 
   <div class="scene">
+    <div class="audio-panel" id="landingAudioPanel">
+      <div class="audio-slider-wrap" id="landingAudioSliderWrap">
+        <input type="range" class="audio-slider" id="landingAudioVolumeSlider" min="0" max="100" value="55" aria-label="音樂音量">
+      </div>
+      <button class="audio-toggle-btn" id="landingAudioToggleBtn" type="button" aria-label="音樂設定">
+        <svg class="icon-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <svg class="icon-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M2 2l20 20"/></svg>
+      </button>
+    </div>
     <section class="hero">
 
       <div class="left-col">
@@ -1253,9 +1361,14 @@
     </div>
 
     <div class="controls-hint">
-      <div class="key-row"><span class="key">W</span></div>
-      <div class="key-row"><span class="key">A</span><span class="key">S</span><span class="key">D</span></div>
-      <p>WASD 移動・拖曳滑鼠環顧四周<br>左鍵點擊家具互動</p>
+      <div class="wasd-grid">
+        <span class="key key-w">W</span>
+        <button class="key key-r" id="resetCameraBtn" type="button" title="回到初始位置">R</button>
+        <span class="key key-a">A</span>
+        <span class="key key-s">S</span>
+        <span class="key key-d">D</span>
+      </div>
+      <p>WASD 移動・拖曳滑鼠環顧四周<br>左鍵點擊家具互動，R回到初始位置。</p>
     </div>
   </div>
 
@@ -1276,6 +1389,15 @@
     <button class="hud-icon" id="chatIcon" type="button" aria-label="留言區" title="留言區">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>
     </button>
+    <div class="audio-panel audio-panel-room" id="roomAudioPanel">
+      <div class="audio-slider-wrap" id="roomAudioSliderWrap">
+        <input type="range" class="audio-slider" id="roomAudioVolumeSlider" min="0" max="100" value="55" aria-label="音樂音量">
+      </div>
+      <button class="audio-toggle-btn" id="roomAudioToggleBtn" type="button" aria-label="音樂設定">
+        <svg class="icon-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <svg class="icon-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M2 2l20 20"/></svg>
+      </button>
+    </div>
   </div>
 
   <!-- Furniture interaction modal -->
@@ -1407,6 +1529,158 @@
   document.getElementById('boardBtn').addEventListener('click', function(){
     showToast('留言板即將推出，敬請期待 📌');
   });
+
+  /* ================================================================
+     Global Audio Manager — UI click SFX + landing/room BGM crossfade
+     ================================================================
+     Browsers block audio.play() until a real user gesture (Autoplay
+     Policy), so this: (1) tries to start the landing BGM immediately in
+     case the browser allows it, and (2) retries on the very first
+     pointerdown anywhere on the page as a guaranteed fallback. Volume/
+     mute state is a single shared source of truth so the landing-page
+     panel and the room/swipe panel (two separate DOM widgets — see
+     bindAudioPanel) always agree with each other.
+  ------------------------------------------------------------------- */
+  var AudioManager = (function(){
+    var sfxClick = new Audio('./assets/sfx/ui-pop.mp3');
+    var bgmLanding = new Audio('./assets/bgm/open-rap.mp3');
+    var bgmRoom = new Audio('./assets/bgm/room-vibe.mp3');
+    bgmLanding.loop = true;
+    bgmRoom.loop = true;
+    sfxClick.volume = 0.5;
+
+    var state = { volume: 0.55, muted: false, unlocked: false };
+    var fadeRaf = { landing: null, room: null };
+
+    function effectiveVolume(){ return state.muted ? 0 : state.volume; }
+
+    function safePlay(el){
+      var p = el.play();
+      if (p && p.catch) p.catch(function(){ /* blocked until a user gesture arrives */ });
+    }
+
+    function fade(el, key, from, to, duration, onDone){
+      if (fadeRaf[key]) cancelAnimationFrame(fadeRaf[key]);
+      var start = performance.now();
+      function step(now){
+        var t = Math.min(1, (now - start) / duration);
+        el.volume = from + (to - from) * t;
+        if (t < 1){
+          fadeRaf[key] = requestAnimationFrame(step);
+        } else {
+          fadeRaf[key] = null;
+          if (onDone) onDone();
+        }
+      }
+      fadeRaf[key] = requestAnimationFrame(step);
+    }
+
+    function playClick(){
+      if (state.muted) return;
+      try {
+        var s = sfxClick.cloneNode(); // clone so rapid/overlapping clicks don't cut each other off
+        s.volume = 0.5 * (state.muted ? 0 : 1);
+        var p = s.play();
+        if (p && p.catch) p.catch(function(){});
+      } catch (err){ /* ignore — SFX is a nice-to-have, never block the click */ }
+    }
+
+    function startLanding(){
+      if (!bgmRoom.paused) bgmRoom.pause();
+      bgmLanding.volume = 0;
+      safePlay(bgmLanding);
+      fade(bgmLanding, 'landing', 0, effectiveVolume(), 500);
+    }
+
+    function crossfadeToRoom(){
+      fade(bgmLanding, 'landing', bgmLanding.volume, 0, 500, function(){ bgmLanding.pause(); });
+      bgmRoom.currentTime = 0;
+      bgmRoom.volume = 0;
+      safePlay(bgmRoom);
+      fade(bgmRoom, 'room', 0, effectiveVolume(), 700);
+    }
+
+    function crossfadeToLanding(){
+      fade(bgmRoom, 'room', bgmRoom.volume, 0, 500, function(){ bgmRoom.pause(); });
+      bgmLanding.volume = 0;
+      safePlay(bgmLanding);
+      fade(bgmLanding, 'landing', 0, effectiveVolume(), 700);
+    }
+
+    function applyVolumeInstant(){
+      var v = effectiveVolume();
+      if (!bgmLanding.paused) bgmLanding.volume = v;
+      if (!bgmRoom.paused) bgmRoom.volume = v;
+    }
+
+    function setVolume(v){
+      state.volume = Math.max(0, Math.min(1, v));
+      state.muted = false;
+      applyVolumeInstant();
+    }
+    function toggleMute(){
+      state.muted = !state.muted;
+      applyVolumeInstant();
+      return state.muted;
+    }
+
+    function unlock(){
+      if (state.unlocked) return;
+      state.unlocked = true;
+      startLanding();
+    }
+    document.addEventListener('pointerdown', unlock, { once: true, passive: true });
+    window.addEventListener('load', startLanding);
+
+    return {
+      playClick: playClick,
+      crossfadeToRoom: crossfadeToRoom,
+      crossfadeToLanding: crossfadeToLanding,
+      setVolume: setVolume,
+      toggleMute: toggleMute,
+      getState: function(){ return state; }
+    };
+  })();
+
+  // Delegated so every current AND future button on the page gets the
+  // click SFX automatically — no need to wire each one individually.
+  document.addEventListener('click', function(e){
+    if (e.target.closest('button')) AudioManager.playClick();
+  });
+
+  function bindAudioPanel(prefix){
+    var btn = document.getElementById(prefix + 'ToggleBtn');
+    var wrap = document.getElementById(prefix + 'SliderWrap');
+    var slider = document.getElementById(prefix + 'VolumeSlider');
+    if (!btn || !wrap || !slider) return;
+
+    function syncIcon(){
+      var muted = AudioManager.getState().muted || AudioManager.getState().volume === 0;
+      btn.classList.toggle('muted', muted);
+      slider.value = Math.round(AudioManager.getState().volume * 100);
+    }
+    syncIcon();
+
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      wrap.classList.toggle('expanded');
+      if (!wrap.classList.contains('expanded')) return;
+      // toggling mute from the icon itself only when the panel was
+      // already open — first click just reveals the slider
+      slider.focus();
+    });
+    slider.addEventListener('input', function(){
+      AudioManager.setVolume(slider.value / 100);
+      syncIcon();
+    });
+    document.addEventListener('click', function(e){
+      if (wrap.classList.contains('expanded') && !wrap.contains(e.target) && e.target !== btn){
+        wrap.classList.remove('expanded');
+      }
+    });
+  }
+  bindAudioPanel('landingAudio');
+  bindAudioPanel('roomAudio');
 
   /* ---------------- Visitor counter (speech bubble) ----------------
      Simulates a "unique ID" dedup: a visitor id is generated once and
@@ -1604,6 +1878,7 @@
       sceneEl.style.display = 'none';
       door.classList.remove('is-open');
       enterRoomScene();
+      AudioManager.crossfadeToRoom();
     }, 2600);
 
     // 5) shrink the black circle back down to reveal the 3D room
@@ -1635,6 +1910,7 @@
     setTimeout(function(){
       leaveRoomScene();
       sceneEl.style.display = '';
+      AudioManager.crossfadeToLanding();
     }, 750);
 
     setTimeout(function(){
@@ -1833,7 +2109,7 @@
   var cameraTween = null;
 
   var velocity = null; // THREE.Vector3, persists across frames for movement damping
-  var MOVE_MAX_SPEED = 3.2;  // world units/sec — slower, more comfortable base speed
+  var MOVE_MAX_SPEED = 2.8;  // world units/sec — slower, more comfortable base speed
   var MOVE_ACCEL = 10;       // how quickly velocity ramps up while a key is held
   var MOVE_DECEL = 5;        // how quickly it glides to a stop after release (inertia)
 
@@ -1999,7 +2275,10 @@
 
       parentObj.userData = { id: cfg.id, label: cfg.label, meshes: meshes, outline: outline, actions: [] };
       furnitureMeshes.push(parentObj);
-      furnitureRuntime[cfg.id] = { pos: [center.x, center.y, center.z], size: [size.x, size.z] };
+      furnitureRuntime[cfg.id] = {
+        pos: [center.x, center.y, center.z], size: [size.x, size.z],
+        minY: box.min.y, maxY: box.max.y, midY: (box.min.y + box.max.y) / 2
+      };
 
       (cfg.children || []).forEach(function(childCfg){
         var childObj = gltf.scene.getObjectByName(childCfg.name);
@@ -2205,11 +2484,26 @@
     return null;
   }
 
+  // Items whose Hover/Raycaster zone was reported as over-eager — hits on
+  // their upper half are ignored, effectively halving the trigger zone.
+  // Covers both plausible current ids for "nightstand" after the Blender
+  // rename (multi_tier_cabinet is the direct former-nightstand; bed is
+  // included too since its label is literally "床頭").
+  var SHRUNK_HOVER_IDS = { multi_tier_cabinet: true, bed: true };
+
   function pickFurniture(){
     raycaster.setFromCamera(mouseVec, camera);
     var hits = raycaster.intersectObjects(furnitureMeshes, true);
-    if (!hits.length) return null;
-    return resolveFurnitureRoot(hits[0].object);
+    for (var i = 0; i < hits.length; i++){
+      var root = resolveFurnitureRoot(hits[i].object);
+      if (!root) continue;
+      if (SHRUNK_HOVER_IDS[root.userData.id]){
+        var rt = furnitureRuntime[root.userData.id];
+        if (rt && hits[i].point.y > rt.midY) continue; // ignore the upper-half hit, try the next one
+      }
+      return root;
+    }
+    return null;
   }
 
   function onCanvasMouseDown(e){
@@ -2233,7 +2527,11 @@
       var dy = e.clientY - dragStart.y;
       if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMoved = true;
       player.yaw = dragStart.yaw - dx * 0.0028;
-      player.pitch = Math.max(-1.2, Math.min(1.2, dragStart.pitch - dy * 0.0028));
+      // Asymmetric pitch clamp — slightly more restrictive looking down
+      // than up, so staring straight down at short furniture (nightstand-
+      // height items) is less likely to put the near plane past their
+      // geometry. maxPolarAngle-style limit for this yaw/pitch camera.
+      player.pitch = Math.max(-1.3, Math.min(0.95, dragStart.pitch - dy * 0.0028));
     }
   }
 
@@ -2260,6 +2558,7 @@
   function onRoomKeyDown(e){
     if (!roomActive) return;
     if (e.code === 'KeyR'){
+      AudioManager.playClick();
       startCameraReset();
       return;
     }
@@ -3020,6 +3319,10 @@
     showToast('留言區即將推出，敬請期待 💬');
   });
 
+  document.getElementById('resetCameraBtn').addEventListener('click', function(){
+    if (roomActive) startCameraReset();
+  });
+
   /* ---------------- Home icon (leave room) ---------------- */
   function handleGoHome(e){
     if (isTransitioning) return;
@@ -3053,14 +3356,15 @@
 
     // Keyboard shortcuts for the swipe (斷捨離) deck — only while it's the
     // active, unobstructed view (no confirm/summary dialog on top), and
-    // routed through triggerButtonSwipe() so they get exactly the same
-    // isAnimating guard, disabled-state handling, and fly-out animation
+    // routed through triggerButtonSwipe()/undoSwipe() so they get exactly
+    // the same isAnimating guard, disabled-state handling, and animation
     // as clicking the on-screen buttons.
     if (swipeScene.classList.contains('active') &&
         !confirmDialogOverlay.classList.contains('active') &&
         !summaryModalOverlay.classList.contains('active')){
-      if (e.key === 'ArrowLeft'){ e.preventDefault(); triggerButtonSwipe('keep'); }
-      else if (e.key === 'ArrowRight'){ e.preventDefault(); triggerButtonSwipe('discard'); }
+      if (e.key === 'ArrowLeft'){ e.preventDefault(); AudioManager.playClick(); triggerButtonSwipe('keep'); }
+      else if (e.key === 'ArrowRight'){ e.preventDefault(); AudioManager.playClick(); triggerButtonSwipe('discard'); }
+      else if (e.key === 'ArrowUp'){ e.preventDefault(); AudioManager.playClick(); undoSwipe(); }
     }
   });
 
