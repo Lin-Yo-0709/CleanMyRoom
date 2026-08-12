@@ -1787,15 +1787,13 @@
   bindAudioPanel('roomAudio');
 
   /* ---------------- Visitor counter (speech bubble) ----------------
-     Simulates a "unique ID" dedup: a visitor id is generated once and
-     stored in localStorage. If it's missing, this is treated as a new
-     unique visitor and the count is bumped by one. Swap the body of
-     fetchVisitorCount() for a real API call when the backend is ready —
-     the localStorage path stays as an offline fallback.
+     A visitor id is generated once and stored in localStorage purely as
+     a client-side dedup key (so a repeat visit isn't miscounted as a new
+     person) — the actual count comes from the Sheet via getCount, not
+     from anything stored locally.
   ------------------------------------------------------------------- */
   var VISITOR_ID_KEY = 'cmr_visitor_id';
-  var VISITOR_COUNT_KEY = 'cmr_visitor_count_v1';
-  var DEMO_SEED_COUNT = 128; // starting number for the local demo only
+  var visitorDisplayName = ''; // set once the landing-page name modal is confirmed (see playEntrance)
 
   function getOrCreateVisitorId(){
     var id = localStorage.getItem(VISITOR_ID_KEY);
@@ -1833,14 +1831,17 @@
 
   // Upserts this visitor's row (see the .gs file — it merges
   // completed_zones server-side rather than overwriting, so an earlier
-  // session's progress is never lost). Called once early on page load to
-  // register every visitor, and again whenever a zone finishes.
+  // session's progress is never lost). Called once for brand-new
+  // visitors on page load (see the bottom of this block — NOT on every
+  // reload, to avoid rewriting a returning visitor's row over and over),
+  // and again whenever a zone finishes.
   function sendRecordToSheet(extra, onDone){
     if (!GOOGLE_SHEET_API_URL) return; // not wired up yet
     var visitor = getOrCreateVisitorId();
     var params = Object.assign({
       action: 'addRecord',
       visitor_id: visitor.id,
+      visitor_name: visitorDisplayName,
       timestamp: new Date().toISOString(),
       completed_zones: completedZones.join(', ')
     }, extra || {});
@@ -1851,47 +1852,39 @@
       .catch(function(err){ console.warn('sendRecordToSheet failed', err); });
   }
 
+  // No local fallback number — if the Sheet can't be reached, `done` is
+  // called with null and the caller shows a neutral message instead of a
+  // fabricated count (a wrong-looking-real number is worse than none).
   function fetchVisitorCount(done){
-    if (GOOGLE_SHEET_API_URL){
-      fetch(sheetApiUrl({ action: 'getCount' }))
-        .then(function(res){ return res.json(); })
-        .then(function(data){
-          if (data && data.ok && typeof data.count === 'number') done(data.count);
-          else done(getLocalCount());
-        })
-        .catch(function(){ done(getLocalCount()); }); // offline fallback
-      return;
-    }
-
-    // ---- Local demo fallback (no Sheet URL configured yet) ----
-    var visitor = getOrCreateVisitorId();
-    var count = getLocalCount();
-    if (visitor.isNew){
-      count += 1;
-      setLocalCount(count);
-    }
-    done(count);
+    if (!GOOGLE_SHEET_API_URL){ done(null); return; }
+    fetch(sheetApiUrl({ action: 'getCount' }))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        done(data && data.ok && typeof data.count === 'number' ? data.count : null);
+      })
+      .catch(function(){ done(null); });
   }
-
-  function getLocalCount(){
-    var n = parseInt(localStorage.getItem(VISITOR_COUNT_KEY) || '', 10);
-    return isNaN(n) ? DEMO_SEED_COUNT : n;
-  }
-  function setLocalCount(n){ localStorage.setItem(VISITOR_COUNT_KEY, String(n)); }
 
   function initVisitorCounter(){
     var speechEl = document.getElementById('speechBubble');
     fetchVisitorCount(function(count){
       if (!speechEl) return;
-      speechEl.innerHTML = '已有 <strong>' + count + '</strong> 人幫助斷捨離，<br>謝謝你~陌生人，歡迎留言';
+      speechEl.innerHTML = (count == null)
+        ? '謝謝每一位陌生的你，<br>幫助我斷捨離，歡迎留言'
+        : '已有 <strong>' + count + '</strong> 人幫助斷捨離，<br>謝謝你~陌生人，歡迎留言';
     });
   }
   initVisitorCounter();
 
-  // Register this visitor in the Sheet right away — not just when they
-  // finish a zone — so the count above reflects everyone who showed up,
-  // not only the ones who completed something.
-  if (GOOGLE_SHEET_API_URL) sendRecordToSheet();
+  // Register brand-new visitors in the Sheet right away — not just when
+  // they finish a zone — so the count above reflects everyone who showed
+  // up. Gated on isNew so a returning visitor reloading the page
+  // repeatedly doesn't rewrite their row every single time.
+  (function registerIfNewVisitor(){
+    if (!GOOGLE_SHEET_API_URL) return;
+    var visitor = getOrCreateVisitorId();
+    if (visitor.isNew) sendRecordToSheet();
+  })();
 
   /* ---------------- Guinea pig wander ---------------- */
   var wrap = document.getElementById('guineaWrap');
@@ -2002,6 +1995,8 @@
 
   function playEntrance(name){
     isTransitioning = true;
+    visitorDisplayName = name;
+    sendRecordToSheet(); // sync the name now — don't wait for a zone to finish
 
     // 1) door swings open
     door.classList.add('is-open');
