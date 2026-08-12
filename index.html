@@ -949,7 +949,7 @@
   }
   .furniture-list li{
     display:grid;
-    grid-template-columns: minmax(64px,1fr) auto minmax(90px,1.4fr) auto auto;
+    grid-template-columns: auto minmax(64px,1fr) auto minmax(90px,1.4fr) auto auto;
     align-items:center;
     gap:10px;
     padding:11px 4px;
@@ -957,6 +957,18 @@
     font-size:13.5px;
   }
   .furniture-list li:last-child{ border-bottom:none; }
+  .furniture-list .item-thumb{
+    width:38px; height:38px;
+    border-radius:8px;
+    overflow:hidden;
+    flex-shrink:0;
+    display:block;
+  }
+  .furniture-list .item-thumb img{
+    width:100%; height:100%;
+    object-fit:cover;
+    display:block;
+  }
   .furniture-list .item-name{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .furniture-list .item-keep{ font-size:12px; color:#2f7d4f; font-weight:700; white-space:nowrap; }
   .furniture-list .item-discard{ font-size:12px; color:#c1503a; font-weight:700; white-space:nowrap; }
@@ -994,6 +1006,7 @@
     flex-wrap:wrap;
   }
   .detail-image{
+    position:relative;
     width:220px; height:220px;
     flex-shrink:0;
     border-radius:14px;
@@ -1001,8 +1014,16 @@
     align-items:center;
     justify-content:center;
     box-shadow: inset 0 0 0 3px rgba(0,0,0,0.12);
+    overflow:hidden;
   }
   .detail-image svg{ width:96px; height:96px; opacity:.85; }
+  .detail-image .item-photo{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
   .detail-info{ flex:1; min-width:200px; display:flex; flex-direction:column; }
   .detail-info h3{ margin:0 0 10px; font-family:"Fraunces", serif; font-size:20px; }
   .detail-info .detail-percentages{ display:flex; gap:14px; margin-bottom:10px; font-size:13px; font-weight:700; }
@@ -1138,14 +1159,23 @@
   .swipe-card.swipe-slot-hidden{ z-index:0; transform: translateY(28px) scale(0.9); opacity:0; pointer-events:none; }
 
   .swipe-card-image{
+    position:relative;
     height:56%;
     display:flex;
     align-items:center;
     justify-content:center;
     flex-shrink:0;
+    overflow:hidden;
   }
   .swipe-card-image svg{ width:30%; height:30%; opacity:.85; color: rgba(0,0,0,0.55); }
-
+  .swipe-card-icon{ display:flex; align-items:center; justify-content:center; }
+  .swipe-card-image .item-photo{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
   .swipe-card-body{
     flex:1;
     padding:16px 20px 20px;
@@ -1256,7 +1286,8 @@
     .minimap-canvas{ width:130px; height:130px; }
     .zone-progress{ max-height:26vh; }
     .controls-hint p{ max-width:160px; }
-    .furniture-list li{ grid-template-columns: minmax(50px,1fr) auto minmax(70px,1fr) auto auto; font-size:12px; }
+    .furniture-list li{ grid-template-columns: auto minmax(50px,1fr) auto minmax(70px,1fr) auto auto; font-size:12px; }
+    .furniture-list .item-thumb{ width:30px; height:30px; }
     .detail-body{ flex-direction:column; align-items:center; text-align:center; }
     .detail-info .detail-percentages{ justify-content:center; }
     .swipe-topbar{ --topbar-gutter: 64px; column-gap:8px; }
@@ -1313,7 +1344,7 @@
       </div>
 
       <div class="right-col">
-        <div class="speech-bubble" id="speechBubble">已有 <strong>0</strong> 人幫助斷捨離，<br>謝謝你~陌生人，歡迎留言</div>
+        <div class="speech-bubble" id="speechBubble">謝謝每一位陌生的你，<br>幫助我斷捨離，歡迎留言</div>
         <svg class="avatar" viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg">
           <ellipse cx="100" cy="248" rx="70" ry="10" fill="rgba(43,25,14,0.12)"/>
           <path d="M40 260 L48 150 Q100 120 152 150 L160 260 Z" fill="#b9bfc6"/>
@@ -1852,17 +1883,34 @@
       .catch(function(err){ console.warn('sendRecordToSheet failed', err); });
   }
 
-  // No local fallback number — if the Sheet can't be reached, `done` is
-  // called with null and the caller shows a neutral message instead of a
-  // fabricated count (a wrong-looking-real number is worse than none).
+  // No local fallback number — if the Sheet truly can't be reached,
+  // `done` is called with null and the caller shows a neutral message
+  // instead of a fabricated count. Retries once with a longer timeout
+  // first, though — Apps Script's cold start (after being idle) can take
+  // several seconds, and a single quick-timeout attempt was giving up
+  // before it had a fair chance to respond.
+  function fetchWithTimeout(url, ms){
+    var controller = new AbortController();
+    var timer = setTimeout(function(){ controller.abort(); }, ms);
+    return fetch(url, { signal: controller.signal }).finally(function(){ clearTimeout(timer); });
+  }
+
   function fetchVisitorCount(done){
     if (!GOOGLE_SHEET_API_URL){ done(null); return; }
-    fetch(sheetApiUrl({ action: 'getCount' }))
-      .then(function(res){ return res.json(); })
-      .then(function(data){
-        done(data && data.ok && typeof data.count === 'number' ? data.count : null);
-      })
-      .catch(function(){ done(null); });
+    var url = sheetApiUrl({ action: 'getCount' });
+
+    function attempt(timeoutMs, isLastTry){
+      fetchWithTimeout(url, timeoutMs)
+        .then(function(res){ return res.json(); })
+        .then(function(data){
+          done(data && data.ok && typeof data.count === 'number' ? data.count : null);
+        })
+        .catch(function(){
+          if (isLastTry) done(null);
+          else attempt(9000, true); // give a slow cold-start one more, longer, chance
+        });
+    }
+    attempt(4000, false);
   }
 
   function initVisitorCounter(){
@@ -1885,6 +1933,34 @@
     var visitor = getOrCreateVisitorId();
     if (visitor.isNew) sendRecordToSheet();
   })();
+
+  /* ---------------- Items sheet (real swipe-deck content) ----------------
+     Loaded once per page visit and cached — not live-updating, so a new
+     row added to the Items sheet only appears after the next full page
+     load. Keyed by zone using the exact ids from FURNITURE_CONFIG (desk,
+     large_wardrobe, bed, wardrobe, low_cabinet, long_cabinet,
+     multi_tier_cabinet) — a "zone" value in the sheet that doesn't match
+     one of these exactly just won't show up anywhere.
+  ------------------------------------------------------------------- */
+  var sheetItemsCache = null; // null = not loaded yet; once loaded, {zoneId: [{itemName,ownedYears,note}, ...]}
+
+  function loadItemsFromSheet(){
+    if (!GOOGLE_SHEET_API_URL || sheetItemsCache) return;
+    fetch(sheetApiUrl({ action: 'getItems' }))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data || !data.ok || !Array.isArray(data.items)) return;
+        var byZone = {};
+        data.items.forEach(function(row){
+          if (!row.zone) return;
+          if (!byZone[row.zone]) byZone[row.zone] = [];
+          byZone[row.zone].push(row);
+        });
+        sheetItemsCache = byZone;
+      })
+      .catch(function(err){ console.warn('loadItemsFromSheet failed', err); });
+  }
+  loadItemsFromSheet(); // kick off early so it's ready well before anyone opens a swipe deck
 
   /* ---------------- Guinea pig wander ---------------- */
   var wrap = document.getElementById('guineaWrap');
@@ -2181,7 +2257,42 @@
     '換季大掃除翻出來的，已經不太記得當初為什麼會買。'
   ];
 
+  function formatHoldTime(v){
+    if (v == null || v === '') return '未知';
+    var s = String(v).trim();
+    return /^[\d.]+$/.test(s) ? s + '年' : s; // bare number → append 年; anything else shown as-is
+  }
+
   function buildSwipeDeck(zoneId){
+    var realItems = (sheetItemsCache && sheetItemsCache[zoneId]) || [];
+    if (realItems.length){
+      // Real rows from the Items sheet. keep% is computed from the
+      // accumulated keep_count/discard_count columns — the running total
+      // of every visitor's decision on this exact item, not a guess.
+      return realItems.map(function(item, i){
+        var keepCount = item.keepCount || 0;
+        var discardCount = item.discardCount || 0;
+        var total = keepCount + discardCount;
+        return {
+          id: zoneId + '-sheet-' + i,
+          name: item.itemName || '未命名物品',
+          keep: total > 0 ? Math.round((keepCount / total) * 100) : 50,
+          noVotes: total === 0, // true → nobody has swiped this yet, show a neutral label instead of a %
+          holdTime: formatHoldTime(item.ownedYears),
+          desc: item.note || '（尚無備註）',
+          isRealItem: true,
+          zone: zoneId,
+          itemName: item.itemName || '',
+          keepCount: keepCount,
+          discardCount: discardCount
+        };
+      });
+    }
+
+    // ---- Demo fallback: used only while the Items sheet has zero rows
+    // for this specific zone, so testing/demoing still works before it's
+    // fully populated. Demo items never record decisions back to the
+    // sheet (isRealItem stays falsy). ----
     var base = (DEMO_ITEMS[zoneId] || []).map(function(item){ return Object.assign({}, item); });
     var deck = base.slice();
     var n = 1;
@@ -2196,6 +2307,29 @@
       n++;
     }
     return deck;
+  }
+
+  // Fires a recordDecision write and optimistically updates the local
+  // cache so the 物品清單 modal reflects this vote immediately, without
+  // waiting for a fresh page load to re-fetch the sheet.
+  function recordSwipeDecision(item, direction){
+    if (!item || !item.isRealItem || !GOOGLE_SHEET_API_URL) return;
+
+    var cached = sheetItemsCache && sheetItemsCache[item.zone];
+    if (cached){
+      var row = cached.find(function(r){ return r.itemName === item.itemName; });
+      if (row){
+        if (direction === 'keep') row.keepCount = (row.keepCount || 0) + 1;
+        else row.discardCount = (row.discardCount || 0) + 1;
+      }
+    }
+
+    fetch(sheetApiUrl({
+      action: 'recordDecision',
+      zone: item.zone,
+      item_name: item.itemName,
+      direction: direction
+    })).catch(function(err){ console.warn('recordSwipeDecision failed', err); });
   }
 
   var renderer, scene, camera, raycaster, mouseVec;
@@ -2952,15 +3086,24 @@
 
   function buildStatsItemList(){
     furnitureListEl.innerHTML = '';
-    var items = DEMO_ITEMS[activeTabId] || [];
+    var items = buildSwipeDeck(activeTabId);
+    var hex = cardHex(activeTabId);
     items.forEach(function(item){
       var discard = 100 - item.keep;
       var li = document.createElement('li');
+      var keepLabel = item.noVotes ? '尚無資料' : ('留 ' + item.keep + '%');
+      var discardLabel = item.noVotes ? '' : (discard + '% 丟');
+      var barKeepWidth = item.noVotes ? 0 : item.keep;
+      var barDiscardWidth = item.noVotes ? 0 : discard;
+      var photoUrl = item.isRealItem ? itemImageUrl(item.zone, item.itemName) : '';
       li.innerHTML =
+        '<span class="item-thumb" style="background:' + hex + '">' +
+          (photoUrl ? '<img src="' + photoUrl + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+        '</span>' +
         '<span class="item-name">' + item.name + '</span>' +
-        '<span class="item-keep">留 ' + item.keep + '%</span>' +
-        '<div class="item-bar"><div class="bar-keep" style="width:' + item.keep + '%"></div><div class="bar-discard" style="width:' + discard + '%"></div></div>' +
-        '<span class="item-discard">' + discard + '% 丟</span>' +
+        '<span class="item-keep">' + keepLabel + '</span>' +
+        '<div class="item-bar"><div class="bar-keep" style="width:' + barKeepWidth + '%"></div><div class="bar-discard" style="width:' + barDiscardWidth + '%"></div></div>' +
+        '<span class="item-discard">' + discardLabel + '</span>' +
         '<button class="item-eye" type="button" aria-label="預覽 ' + item.name + '">' + eyeIconSvg + '</button>';
       li.querySelector('.item-name').addEventListener('click', function(){ openItemDetail(item); });
       li.querySelector('.item-eye').addEventListener('click', function(){ openItemDetail(item); });
@@ -3002,10 +3145,18 @@
     var cfg = FURNITURE_CONFIG.find(function(c){ return c.id === activeTabId; });
     var hex = cfg ? '#' + cfg.color.toString(16).padStart(6, '0') : '#cccccc';
     detailImageEl.style.background = hex;
-    detailImageEl.innerHTML = eyeIconSvg.replace('stroke-width="2"', 'stroke-width="1.4"');
+    var iconMarkup = eyeIconSvg.replace('stroke-width="2"', 'stroke-width="1.4"');
+    var photoUrl = item.isRealItem ? itemImageUrl(item.zone, item.itemName) : '';
+    detailImageEl.innerHTML = iconMarkup +
+      (photoUrl ? '<img class="item-photo" src="' + photoUrl + '" alt="" onerror="this.style.display=\'none\'">' : '');
     detailNameEl.textContent = item.name;
-    detailKeepEl.textContent = '留 ' + item.keep + '%';
-    detailDiscardEl.textContent = (100 - item.keep) + '% 丟';
+    if (item.noVotes){
+      detailKeepEl.textContent = '尚無資料';
+      detailDiscardEl.textContent = '';
+    } else {
+      detailKeepEl.textContent = '留 ' + item.keep + '%';
+      detailDiscardEl.textContent = (100 - item.keep) + '% 丟';
+    }
     detailDescEl.textContent = item.desc;
     itemDetailModalOverlay.classList.add('active');
   }
@@ -3064,6 +3215,16 @@
 
   var swipeState = null; // { zoneId, deck, index, history:[{item,direction}] }
   var cardIconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l4.5-6 3.5 4.5 2.5-3L20 16"/><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>';
+
+  // Convention: ./assets/images/items/{zone}/{itemName}.jpg — filename
+  // matches the itemName exactly as typed in the Items sheet. No image
+  // uploaded yet for a given item just means the <img> 404s and the
+  // onerror handler hides it, revealing the colored icon swatch
+  // underneath — never a broken-image icon.
+  function itemImageUrl(zone, itemName){
+    if (!zone || !itemName) return '';
+    return './assets/images/items/' + encodeURIComponent(zone) + '/' + encodeURIComponent(itemName) + '.jpg';
+  }
   var SLOT_COUNT = 5; // 1 interactive front card + 4 real-content cards stacked behind it
   var slotEls = [];   // slotEls[0] is ALWAYS the front card — the single source of
                        // truth for "what's on top". Only ever reordered via shift/push,
@@ -3131,7 +3292,7 @@
       var card = document.createElement('div');
       card.className = 'swipe-card no-anim';
       card.innerHTML =
-        '<div class="swipe-card-image"></div>' +
+        '<div class="swipe-card-image"><div class="swipe-card-icon">' + cardIconSvg + '</div><img class="item-photo" alt=""></div>' +
         '<div class="swipe-card-body">' +
           '<div class="swipe-card-header"><h3></h3><span class="hold-tag"></span></div>' +
           '<p class="swipe-card-desc"></p>' +
@@ -3147,7 +3308,16 @@
 
   function fillCardContent(el, item, hex){
     el.querySelector('.swipe-card-image').style.background = hex;
-    el.querySelector('.swipe-card-image').innerHTML = cardIconSvg;
+    var photoEl = el.querySelector('.item-photo');
+    var url = item.isRealItem ? itemImageUrl(item.zone, item.itemName) : '';
+    if (url){
+      photoEl.style.display = '';
+      photoEl.onerror = function(){ photoEl.style.display = 'none'; };
+      photoEl.src = url;
+    } else {
+      photoEl.style.display = 'none';
+      photoEl.removeAttribute('src');
+    }
     el.querySelector('.swipe-card-header h3').textContent = item.name;
     el.querySelector('.hold-tag').textContent = item.holdTime;
     el.querySelector('.swipe-card-desc').textContent = item.desc;
@@ -3287,6 +3457,8 @@
     // new session's slotEls/index.
     var session = swipeState;
     var flownEl = slotEls[0];
+
+    recordSwipeDecision(item, direction);
 
     try {
       flownEl.classList.remove('swipe-slot-0');
