@@ -1807,23 +1807,63 @@
     return { id: id, isNew: true };
   }
 
-  function fetchVisitorCount(done){
-    // ---------------------------------------------------------------
-    // Real API hookup (uncomment once the backend endpoint exists):
-    //
-    // var visitor = getOrCreateVisitorId();
-    // fetch('/api/visitors/count', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ visitorId: visitor.id })
-    // })
-    //   .then(function(res){ return res.json(); })
-    //   .then(function(data){ done(data.count); })
-    //   .catch(function(){ done(getLocalCount()); }); // offline fallback
-    // return;
-    // ---------------------------------------------------------------
+  /* ---------------- Google Sheet API (Apps Script Web App) ----------------
+     Uses GET with query-string params, not POST with a JSON body. Apps
+     Script's /exec URL responds with a 302 redirect to the real execution
+     URL, and browsers downgrade a POST to a GET when following a 302 —
+     so a POST's doPost handler silently never runs. GET-to-GET redirects
+     don't have this problem, hence doGet handles everything (see the .gs
+     file). This also means no CORS preflight (GET has no custom headers
+     or body), so the response is readable normally.
+  --------------------------------------------------------------------- */
+  var GOOGLE_SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbzGSQMvkXzLRNS7StNaWwZVzXI1sdC5EKMVlH6K9WK50nScD-ray0yG2Q5PWP2AU_u9/exec';
 
-    // ---- Local demo fallback (no backend yet) ----
+  var completedZones = []; // ids accumulate here for the life of this visit, e.g. ['desk','bed']
+
+  function markZoneCompleted(zoneId){
+    if (completedZones.indexOf(zoneId) === -1) completedZones.push(zoneId);
+  }
+
+  function sheetApiUrl(params){
+    var qs = Object.keys(params).map(function(k){
+      return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+    }).join('&');
+    return GOOGLE_SHEET_API_URL + '?' + qs;
+  }
+
+  // Upserts this visitor's row (see the .gs file — it merges
+  // completed_zones server-side rather than overwriting, so an earlier
+  // session's progress is never lost). Called once early on page load to
+  // register every visitor, and again whenever a zone finishes.
+  function sendRecordToSheet(extra, onDone){
+    if (!GOOGLE_SHEET_API_URL) return; // not wired up yet
+    var visitor = getOrCreateVisitorId();
+    var params = Object.assign({
+      action: 'addRecord',
+      visitor_id: visitor.id,
+      timestamp: new Date().toISOString(),
+      completed_zones: completedZones.join(', ')
+    }, extra || {});
+
+    fetch(sheetApiUrl(params))
+      .then(function(res){ return res.json(); })
+      .then(function(data){ if (onDone) onDone(data); })
+      .catch(function(err){ console.warn('sendRecordToSheet failed', err); });
+  }
+
+  function fetchVisitorCount(done){
+    if (GOOGLE_SHEET_API_URL){
+      fetch(sheetApiUrl({ action: 'getCount' }))
+        .then(function(res){ return res.json(); })
+        .then(function(data){
+          if (data && data.ok && typeof data.count === 'number') done(data.count);
+          else done(getLocalCount());
+        })
+        .catch(function(){ done(getLocalCount()); }); // offline fallback
+      return;
+    }
+
+    // ---- Local demo fallback (no Sheet URL configured yet) ----
     var visitor = getOrCreateVisitorId();
     var count = getLocalCount();
     if (visitor.isNew){
@@ -1846,44 +1886,12 @@
       speechEl.innerHTML = '已有 <strong>' + count + '</strong> 人幫助斷捨離，<br>謝謝你~陌生人，歡迎留言';
     });
   }
-
-  /* ---------------- Google Sheet API (Apps Script Web App) ----------------
-     Paste your deployed Apps Script Web App URL below once it's live —
-     see the .gs code shared alongside this file. Until then this is a
-     harmless no-op (addRecord just returns early), so nothing breaks.
-  --------------------------------------------------------------------- */
-  var GOOGLE_SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbzGSQMvkXzLRNS7StNaWwZVzXI1sdC5EKMVlH6K9WK50nScD-ray0yG2Q5PWP2AU_u9/exec';
-
-  var completedZones = []; // ids accumulate here for the life of this visit, e.g. ['desk','bed']
-
-  function markZoneCompleted(zoneId){
-    if (completedZones.indexOf(zoneId) === -1) completedZones.push(zoneId);
-  }
-
-  // Fires an addRecord write to the Visitors sheet: one row per visitor,
-  // updated in place each time a zone finishes so completed_zones always
-  // reflects the running total for this visit (see the .gs code's
-  // upsert-by-visitor_id logic).
-  function sendRecordToSheet(extra){
-    if (!GOOGLE_SHEET_API_URL) return; // not wired up yet
-    var visitor = getOrCreateVisitorId();
-    var payload = Object.assign({
-      action: 'addRecord',
-      visitor_id: visitor.id,
-      timestamp: new Date().toISOString(),
-      completed_zones: completedZones.join(', ')
-    }, extra || {});
-
-    // text/plain avoids a CORS preflight against Apps Script, which
-    // doesn't support the OPTIONS method Content-Type:application/json
-    // would trigger.
-    fetch(GOOGLE_SHEET_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    }).catch(function(err){ console.warn('sendRecordToSheet failed', err); });
-  }
   initVisitorCounter();
+
+  // Register this visitor in the Sheet right away — not just when they
+  // finish a zone — so the count above reflects everyone who showed up,
+  // not only the ones who completed something.
+  if (GOOGLE_SHEET_API_URL) sendRecordToSheet();
 
   /* ---------------- Guinea pig wander ---------------- */
   var wrap = document.getElementById('guineaWrap');
