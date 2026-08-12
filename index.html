@@ -486,16 +486,15 @@
   .transition-circle{
     position:fixed;
     top:0; left:0;
-    width:12px; height:12px;
-    border-radius:50%;
-    background: radial-gradient(circle, #0a0603 0%, #000000 55%, #000000 100%);
-    transform: translate(-50%,-50%) scale(0);
-    z-index:400;
+    width:100vw; height:100vh;
+    background:#000;
+    z-index:99999;
     pointer-events:none;
+    opacity:0;
+    transition: opacity 1.05s cubic-bezier(.5,0,.2,1);
   }
   .transition-circle.grow{
-    transition: transform 1.05s cubic-bezier(.5,0,.2,1);
-    transform: translate(-50%,-50%) scale(320);
+    opacity:1;
   }
 
   .transition-text{
@@ -508,7 +507,7 @@
     gap:10px;
     color: var(--paper);
     opacity:0;
-    z-index:401;
+    z-index:100000;
     pointer-events:none;
     transition: opacity .5s ease;
     text-align:center;
@@ -647,6 +646,14 @@
   }
   .room-logo span{ color: var(--gold); }
 
+  .room-logo-img{
+    display:block;
+    width:140px;
+    height:auto;
+    margin-bottom:8px;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35));
+  }
+
   .minimap-canvas{
     width:180px; height:180px;
     background: rgba(239,231,216,0.94);
@@ -654,6 +661,7 @@
     border-radius:14px;
     box-shadow: var(--shadow);
     display:block;
+    transform: scaleY(-1); /* flip vertically so "forward" reads more intuitively */
   }
 
   .zone-progress{
@@ -1388,6 +1396,7 @@
     </div>
 
     <div class="room-hud-left">
+      <img class="room-logo-img" src="./assets/images/logo.png" alt="Clean My Room" onerror="this.style.display='none'">
       <div class="room-logo">Clean <span>My</span> Room</div>
       <canvas class="minimap-canvas" id="minimapCanvas" width="160" height="160" aria-label="房間頂視小地圖"></canvas>
       <div class="zone-progress">
@@ -1587,10 +1596,19 @@
     sfxClick.volume = 0.5;
     sfxDiscard.volume = 0.6;
 
-    var state = { volume: 0.55, muted: false, unlocked: false };
+    var state = { volume: 0.55, muted: false, unlocked: false, currentScene: 'home' };
     var fadeRaf = { landing: null, room: null };
 
     function effectiveVolume(){ return state.muted ? 0 : state.volume; }
+
+    // The volume/mute controls must only ever affect whichever track is
+    // actually relevant to what's on screen right now. bgmRoom gets
+    // primed (played silently) well before the room is ever entered —
+    // so "is it paused?" alone is NOT a safe way to decide whether the
+    // landing-page volume panel should be allowed to touch it. This is
+    // the actual fix for the cross-bleed bug: routing is keyed on
+    // currentScene, not on play/pause state.
+    function activeTrack(){ return state.currentScene === 'room' ? bgmRoom : bgmLanding; }
 
     function safePlay(el){
       var p = el.play();
@@ -1659,6 +1677,7 @@
     }
 
     function crossfadeToRoom(){
+      state.currentScene = 'room';
       fade(bgmLanding, 'landing', bgmLanding.volume, 0, 500, function(){ bgmLanding.pause(); });
       if (bgmRoom.paused){
         // fallback in case primeRoomBGM() wasn't called (or the browser
@@ -1671,6 +1690,7 @@
     }
 
     function crossfadeToLanding(){
+      state.currentScene = 'home';
       fade(bgmRoom, 'room', bgmRoom.volume, 0, 500, function(){ bgmRoom.pause(); });
       bgmLanding.volume = 0;
       safePlay(bgmLanding);
@@ -1679,8 +1699,8 @@
 
     function applyVolumeInstant(){
       var v = effectiveVolume();
-      if (!bgmLanding.paused) bgmLanding.volume = v;
-      if (!bgmRoom.paused) bgmRoom.volume = v;
+      var track = activeTrack();
+      if (!track.paused) track.volume = v;
     }
 
     function setVolume(v){
@@ -1713,6 +1733,7 @@
       playClick: playClick,
       playDiscard: playDiscard,
       primeRoomBGM: primeRoomBGM,
+      playRoomBGM: primeRoomBGM, // alias — same function, name matches the spec's wording
       crossfadeToRoom: crossfadeToRoom,
       crossfadeToLanding: crossfadeToLanding,
       setVolume: setVolume,
@@ -1825,6 +1846,43 @@
       speechEl.innerHTML = '已有 <strong>' + count + '</strong> 人幫助斷捨離，<br>謝謝你~陌生人，歡迎留言';
     });
   }
+
+  /* ---------------- Google Sheet API (Apps Script Web App) ----------------
+     Paste your deployed Apps Script Web App URL below once it's live —
+     see the .gs code shared alongside this file. Until then this is a
+     harmless no-op (addRecord just returns early), so nothing breaks.
+  --------------------------------------------------------------------- */
+  var GOOGLE_SHEET_API_URL = ''; // e.g. 'https://script.google.com/macros/s/XXXXXXXX/exec'
+
+  var completedZones = []; // ids accumulate here for the life of this visit, e.g. ['desk','bed']
+
+  function markZoneCompleted(zoneId){
+    if (completedZones.indexOf(zoneId) === -1) completedZones.push(zoneId);
+  }
+
+  // Fires an addRecord write to the Visitors sheet: one row per visitor,
+  // updated in place each time a zone finishes so completed_zones always
+  // reflects the running total for this visit (see the .gs code's
+  // upsert-by-visitor_id logic).
+  function sendRecordToSheet(extra){
+    if (!GOOGLE_SHEET_API_URL) return; // not wired up yet
+    var visitor = getOrCreateVisitorId();
+    var payload = Object.assign({
+      action: 'addRecord',
+      visitor_id: visitor.id,
+      timestamp: new Date().toISOString(),
+      completed_zones: completedZones.join(', ')
+    }, extra || {});
+
+    // text/plain avoids a CORS preflight against Apps Script, which
+    // doesn't support the OPTIONS method Content-Type:application/json
+    // would trigger.
+    fetch(GOOGLE_SHEET_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    }).catch(function(err){ console.warn('sendRecordToSheet failed', err); });
+  }
   initVisitorCounter();
 
   /* ---------------- Guinea pig wander ---------------- */
@@ -1902,7 +1960,10 @@
     nameInput.classList.remove('shake');
   }
 
-  doorWrap.addEventListener('click', openModal);
+  doorWrap.addEventListener('click', function(){
+    AudioManager.playRoomBGM(); // synchronous with this click — see primeRoomBGM's comment
+    openModal();
+  });
   cancelBtn.addEventListener('click', closeModal);
   modalOverlay.addEventListener('click', function(e){
     if (e.target === modalOverlay) closeModal();
@@ -1934,17 +1995,10 @@
   function playEntrance(name){
     isTransitioning = true;
 
-    // position the black circle's origin at the door's screen center
-    var rect = doorWrap.getBoundingClientRect();
-    var cx = rect.left + rect.width / 2;
-    var cy = rect.top + rect.height / 2;
-    transitionCircle.style.left = cx + 'px';
-    transitionCircle.style.top = cy + 'px';
-
     // 1) door swings open
     door.classList.add('is-open');
 
-    // 2) black gradient begins enlarging shortly after
+    // 2) black overlay fades in shortly after
     setTimeout(function(){
       transitionCircle.classList.add('grow');
     }, 420);
@@ -1965,27 +2019,16 @@
       AudioManager.crossfadeToRoom();
     }, 2600);
 
-    // 5) shrink the black circle back down to reveal the 3D room
+    // 5) fade the black overlay back out to reveal the 3D room
     setTimeout(function(){
       transitionCircle.classList.remove('grow');
-      transitionCircle.style.transitionDuration = '0s';
-      requestAnimationFrame(function(){
-        transitionCircle.style.left = '50%';
-        transitionCircle.style.top = '50%';
-        setTimeout(function(){
-          transitionCircle.style.transitionDuration = '';
-          isTransitioning = false;
-        }, 50);
-      });
+      isTransitioning = false;
     }, 3000);
   }
 
   // returning from the 3D room back to the landing page
-  function playExit(originX, originY){
+  function playExit(){
     isTransitioning = true;
-    transitionCircle.style.left = originX + 'px';
-    transitionCircle.style.top = originY + 'px';
-    transitionCircle.style.transitionDuration = '';
 
     requestAnimationFrame(function(){
       transitionCircle.classList.add('grow');
@@ -1999,15 +2042,7 @@
 
     setTimeout(function(){
       transitionCircle.classList.remove('grow');
-      transitionCircle.style.transitionDuration = '0s';
-      requestAnimationFrame(function(){
-        transitionCircle.style.left = '50%';
-        transitionCircle.style.top = '50%';
-        setTimeout(function(){
-          transitionCircle.style.transitionDuration = '';
-          isTransitioning = false;
-        }, 50);
-      });
+      isTransitioning = false;
     }, 1150);
   }
 
@@ -3397,6 +3432,8 @@
     var cfg = FURNITURE_CONFIG.find(function(c){ return c.id === zoneId; });
     furnitureState[zoneId].progress = 100;
     refreshZoneRow(zoneId);
+    markZoneCompleted(zoneId);
+    sendRecordToSheet({ last_completed_zone: zoneId });
     closeSwipeSummary();
     closeSwipeSession();
     showToast('『' + (cfg ? cfg.label : '') + '』整理完成，已標記為已整理 100% ✅');
