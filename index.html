@@ -1587,6 +1587,7 @@
   <!-- GLTFLoader r128 (matches three.min.js above). cdnjs doesn't mirror
        three.js's examples/ folder, so this comes from jsDelivr instead. -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
 
 <script>
 (function(){
@@ -2365,7 +2366,7 @@
   var cameraTween = null;
 
   var velocity = null; // THREE.Vector3, persists across frames for movement damping
-  var MOVE_MAX_SPEED = 2.3;  // world units/sec — slower, more comfortable base speed
+  var MOVE_MAX_SPEED = 1.8;  // world units/sec — slower, more comfortable base speed
   var MOVE_ACCEL = 10;       // how quickly velocity ramps up while a key is held
   var MOVE_DECEL = 5;        // how quickly it glides to a stop after release (inertia)
 
@@ -2392,7 +2393,7 @@
     renderer.toneMappingExposure = 1.1;
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xbfe0e8);
+    scene.background = new THREE.Color(0xbfe0e8); // replaced once the HDRI below finishes loading
     scene.fog = new THREE.Fog(0xbfe0e8, 18, 34);
 
     camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.05, 100);
@@ -2403,6 +2404,8 @@
     sun.position.set(6, 10, 4);
     scene.add(sun);
     scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+
+    loadHdriEnvironment();
 
     raycaster = new THREE.Raycaster();
     // r128 defaults Line hit-testing to a 1-world-unit threshold, which
@@ -2452,6 +2455,39 @@
   var roomLoadRetryBtn = document.getElementById('roomLoadRetryBtn');
   if (roomLoadRetryBtn){
     roomLoadRetryBtn.addEventListener('click', function(){ loadRoomModel(); });
+  }
+
+  var HDRI_PATH = './assets/hdri/sky-clouds-1k.hdr';
+
+  // Loads a 1K equirectangular sky HDRI for two things at once:
+  //  1) scene.environment — image-based lighting so the baked AORM/Color
+  //     materials get realistic ambient reflections instead of only the
+  //     flat Hemisphere/Directional/Ambient rig above.
+  //  2) scene.background — replaces the flat placeholder sky color with
+  //     the real sky, visible through windows/the open doorway.
+  // Silently keeps the flat color as-is if the file isn't there yet or
+  // RGBELoader didn't load — never blocks the room from working.
+  function loadHdriEnvironment(){
+    if (typeof THREE.RGBELoader !== 'function') return;
+    var pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+
+    new THREE.RGBELoader()
+      .setDataType(THREE.UnsignedByteType)
+      .load(
+        HDRI_PATH,
+        function (hdrTexture) {
+          var envMap = pmrem.fromEquirectangular(hdrTexture).texture;
+          scene.environment = envMap;
+          scene.background = envMap;
+          hdrTexture.dispose();
+          pmrem.dispose();
+        },
+        undefined,
+        function (error) {
+          console.warn('HDRI not loaded (' + HDRI_PATH + ') — keeping the flat sky color', error);
+        }
+      );
   }
 
   function loadRoomModel(){
