@@ -1587,7 +1587,7 @@
   <!-- GLTFLoader r128 (matches three.min.js above). cdnjs doesn't mirror
        three.js's examples/ folder, so this comes from jsDelivr instead. -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
 
 <script>
 (function(){
@@ -2457,22 +2457,24 @@
     roomLoadRetryBtn.addEventListener('click', function(){ loadRoomModel(); });
   }
 
-  var HDRI_PATH = './assets/hdri/sky-clouds-1k.hdr';
+  var HDRI_PATH = './assets/hdri/sky-clouds-1k.exr';
 
-  // Loads a 1K equirectangular sky HDRI for two things at once:
+  // Loads a 1K equirectangular sky HDRI (OpenEXR format — three.js's
+  // RGBELoader only reads Radiance .hdr, not .exr, hence EXRLoader here)
+  // for two things at once:
   //  1) scene.environment — image-based lighting so the baked AORM/Color
   //     materials get realistic ambient reflections instead of only the
   //     flat Hemisphere/Directional/Ambient rig above.
   //  2) scene.background — replaces the flat placeholder sky color with
   //     the real sky, visible through windows/the open doorway.
   // Silently keeps the flat color as-is if the file isn't there yet or
-  // RGBELoader didn't load — never blocks the room from working.
+  // EXRLoader didn't load — never blocks the room from working.
   function loadHdriEnvironment(){
-    if (typeof THREE.RGBELoader !== 'function') return;
+    if (typeof THREE.EXRLoader !== 'function') return;
     var pmrem = new THREE.PMREMGenerator(renderer);
     pmrem.compileEquirectangularShader();
 
-    new THREE.RGBELoader()
+    new THREE.EXRLoader()
       .setDataType(THREE.UnsignedByteType)
       .load(
         HDRI_PATH,
