@@ -1587,6 +1587,7 @@
   <!-- GLTFLoader r128 (matches three.min.js above). cdnjs doesn't mirror
        three.js's examples/ folder, so this comes from jsDelivr instead. -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fflate@0.6.9/umd/index.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
 
 <script>
@@ -1652,7 +1653,7 @@
       var start = performance.now();
       function step(now){
         var t = Math.min(1, (now - start) / duration);
-        el.volume = from + (to - from) * t;
+        el.volume = Math.max(0, Math.min(1, from + (to - from) * t));
         if (t < 1){
           fadeRaf[key] = requestAnimationFrame(step);
         } else {
@@ -2470,7 +2471,10 @@
   // Silently keeps the flat color as-is if the file isn't there yet or
   // EXRLoader didn't load — never blocks the room from working.
   function loadHdriEnvironment(){
-    if (typeof THREE.EXRLoader !== 'function') return;
+    if (typeof THREE.EXRLoader !== 'function'){
+      console.warn('THREE.EXRLoader is not defined — the EXRLoader.js <script> tag failed to load (check Network tab / an ad-blocker / CDN issue). Sky stays the flat placeholder color.');
+      return;
+    }
     var pmrem = new THREE.PMREMGenerator(renderer);
     pmrem.compileEquirectangularShader();
 
@@ -2484,10 +2488,11 @@
           scene.background = envMap;
           hdrTexture.dispose();
           pmrem.dispose();
+          console.log('[HDRI] loaded OK from ' + HDRI_PATH);
         },
         undefined,
         function (error) {
-          console.warn('HDRI not loaded (' + HDRI_PATH + ') — keeping the flat sky color', error);
+          console.warn('HDRI failed to load from "' + HDRI_PATH + '" — keeping the flat sky color. Check the exact filename/case and that it was actually pushed to the repo.', error);
         }
       );
   }
