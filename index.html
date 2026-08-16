@@ -2391,7 +2391,7 @@
     // that color info is effectively discarded.
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 0.95;
 
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xbfe0e8); // replaced once the HDRI below finishes loading
@@ -2400,11 +2400,17 @@
     camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.05, 100);
     camera.rotation.order = 'YXZ';
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x6b5240, 0.9));
-    var sun = new THREE.DirectionalLight(0xfff2da, 0.85);
+    // Dimmed well below the earlier values: the baked textures now carry
+    // their own AO shading, and loadHdriEnvironment() below adds real
+    // image-based ambient/reflective light on top. Keeping the original
+    // "flat material" light levels here was stacking three light sources
+    // on top of each other — AO + full realtime rig + HDRI — which is
+    // what was blowing the room out. This rig is now just a subtle key
+    // light for a bit of directional definition, not the main light.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x6b5240, 0.3));
+    var sun = new THREE.DirectionalLight(0xfff2da, 0.35);
     sun.position.set(6, 10, 4);
     scene.add(sun);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 
     loadHdriEnvironment();
 
