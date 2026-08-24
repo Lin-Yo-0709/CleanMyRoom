@@ -499,13 +499,20 @@
   .comment-radio-label{
     display:flex;
     align-items:center;
-    gap:10px;
+    flex-wrap:wrap;
+    gap:6px 10px;
     font-family:"Fraunces", serif;
     font-size:17px;
     font-weight:700;
     color: var(--ink);
     cursor:pointer;
     flex-shrink:0;
+  }
+  .comment-label-hint{
+    font-family:"Noto Sans TC",sans-serif;
+    font-weight:400;
+    font-size:12px;
+    color: var(--ink-soft);
   }
   .comment-radio-label input[type="radio"]{
     width:19px; height:19px;
@@ -1770,19 +1777,6 @@
     </div>
   </div>
 
-  <!-- Nickname prompt (first time opening the comment modal) -->
-  <div class="modal-overlay" id="nicknameModalOverlay" role="dialog" aria-modal="true" aria-labelledby="nicknameModalTitle">
-    <div class="modal-card">
-      <h2 id="nicknameModalTitle">您的暱稱/名字</h2>
-      <p>留言前先告訴房間你是誰</p>
-      <input id="nicknameInput" type="text" placeholder="你的暱稱" maxlength="12" autocomplete="off">
-      <div class="modal-actions">
-        <button id="nicknameCancelBtn" type="button">取消</button>
-        <button id="nicknameConfirmBtn" type="button">確認</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Comment modal (3D room) -->
   <div class="modal-overlay comment-overlay" id="commentModalOverlay" role="dialog" aria-modal="true" aria-labelledby="commentModalTitle">
     <div class="modal-card comment-card">
@@ -1792,7 +1786,7 @@
       <div class="comment-option-row" id="commentGeneralRow">
         <label class="comment-radio-label" id="commentGeneralLabel">
           <input type="radio" name="commentCategory" id="commentCategoryGeneral" value="general" checked>
-          一般建議
+          一般建議 <span class="comment-label-hint">(例:收納技巧、斷捨離原則…)</span>
         </label>
       </div>
       <div class="comment-option-row" id="commentItemRow">
@@ -3193,6 +3187,16 @@
 
   function onRoomKeyDown(e){
     if (!roomActive) return;
+
+    // Never fire 3D shortcuts while the user is typing somewhere (e.g.
+    // the comment textarea) or while a comment-flow modal is up — R used
+    // to reset the camera even mid-sentence in the comment box, since
+    // this listener is on window and doesn't care what has focus.
+    var activeEl = document.activeElement;
+    var isTyping = !!activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+    var isCommentModalOpen = commentModalOverlay.classList.contains('active');
+    if (isTyping || isCommentModalOpen) return;
+
     if (e.code === 'KeyR'){
       AudioManager.playClick();
       startCameraReset();
@@ -3999,51 +4003,6 @@
   // leave them stranded on an empty stack with no summary either.
 
   /* ---------------- Comment modal (3D room 留言) ---------------- */
-  var NICKNAME_KEY = 'cmr_comment_nickname';
-  function getCommentNickname(){ return localStorage.getItem(NICKNAME_KEY) || ''; }
-  function setCommentNickname(name){ localStorage.setItem(NICKNAME_KEY, name); }
-
-  var nicknameModalOverlay = document.getElementById('nicknameModalOverlay');
-  var nicknameInput = document.getElementById('nicknameInput');
-  var nicknameCancelBtn = document.getElementById('nicknameCancelBtn');
-  var nicknameConfirmBtn = document.getElementById('nicknameConfirmBtn');
-  var nicknamePendingCallback = null;
-
-  function openNicknamePrompt(onConfirmed){
-    nicknameInput.value = getCommentNickname() || visitorDisplayName || '';
-    nicknameModalOverlay.classList.add('active');
-    controlsPaused = true;
-    nicknamePendingCallback = onConfirmed;
-    setTimeout(function(){ nicknameInput.focus(); }, 150);
-  }
-  function closeNicknamePrompt(){
-    nicknameModalOverlay.classList.remove('active');
-    nicknamePendingCallback = null;
-    if (!commentModalOverlay.classList.contains('active')) controlsPaused = false;
-  }
-  nicknameCancelBtn.addEventListener('click', closeNicknamePrompt);
-  nicknameModalOverlay.addEventListener('click', function(e){
-    if (e.target === nicknameModalOverlay) closeNicknamePrompt();
-  });
-  nicknameInput.addEventListener('keydown', function(e){
-    if (e.key === 'Enter') nicknameConfirmBtn.click();
-  });
-  nicknameConfirmBtn.addEventListener('click', function(){
-    var name = nicknameInput.value.trim();
-    if (!name){
-      nicknameInput.classList.remove('shake');
-      void nicknameInput.offsetWidth;
-      nicknameInput.classList.add('shake');
-      nicknameInput.focus();
-      return;
-    }
-    setCommentNickname(name);
-    var cb = nicknamePendingCallback;
-    nicknameModalOverlay.classList.remove('active');
-    nicknamePendingCallback = null;
-    if (cb) cb();
-  });
-
   var commentModalOverlay = document.getElementById('commentModalOverlay');
   var commentCloseBtn = document.getElementById('commentCloseBtn');
   var commentCategoryGeneral = document.getElementById('commentCategoryGeneral');
@@ -4158,7 +4117,7 @@
       return;
     }
 
-    var nickname = getCommentNickname() || '匿名';
+    var nickname = visitorDisplayName || '匿名';
     if (GOOGLE_SHEET_API_URL){
       fetch(sheetApiUrl({
         action: 'addComment',
@@ -4175,12 +4134,7 @@
     showToast('謝謝你的寶貴建議😊');
   });
 
-  function launchCommentFlow(){
-    if (!getCommentNickname()) openNicknamePrompt(openCommentModal);
-    else openCommentModal();
-  }
-
-  document.getElementById('chatIcon').addEventListener('click', launchCommentFlow);
+  document.getElementById('chatIcon').addEventListener('click', openCommentModal);
 
   document.getElementById('resetCameraBtn').addEventListener('click', function(){
     if (roomActive) startCameraReset();
@@ -4208,7 +4162,6 @@
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape'){
       if (confirmDialogOverlay.classList.contains('active')){ closeConfirmDialog(); return; }
-      if (nicknameModalOverlay.classList.contains('active')){ closeNicknamePrompt(); return; }
       if (commentModalOverlay.classList.contains('active')){ closeCommentModal(); return; }
       if (summaryModalOverlay.classList.contains('active')){ closeSwipeSummary(); return; }
       if (swipeScene.classList.contains('active')){ swipeCloseBtn.click(); return; }
@@ -4226,7 +4179,11 @@
     // as clicking the on-screen buttons.
     if (swipeScene.classList.contains('active') &&
         !confirmDialogOverlay.classList.contains('active') &&
-        !summaryModalOverlay.classList.contains('active')){
+        !summaryModalOverlay.classList.contains('active') &&
+        !commentModalOverlay.classList.contains('active')){
+      var activeEl2 = document.activeElement;
+      var isTyping2 = !!activeEl2 && (activeEl2.tagName === 'INPUT' || activeEl2.tagName === 'TEXTAREA' || activeEl2.isContentEditable);
+      if (isTyping2) return;
       if (e.key === 'ArrowLeft'){ e.preventDefault(); triggerButtonSwipe('keep'); }
       else if (e.key === 'ArrowRight'){ e.preventDefault(); triggerButtonSwipe('discard'); }
       else if (e.key === 'ArrowUp'){ e.preventDefault(); AudioManager.playClick(); undoSwipe(); }
