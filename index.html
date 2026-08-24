@@ -455,7 +455,134 @@
     transition: border-color .2s ease;
   }
   .modal-card input:focus{ border-color: var(--coral-deep); }
-  .modal-card input.shake{ animation: shake .35s ease; border-color: var(--coral-deep); }
+
+  .sr-only{
+    position:absolute; width:1px; height:1px;
+    padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+
+  /* -------- Comment modal (3D room 留言) -------- */
+  .modal-overlay.comment-overlay{
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(4px);
+  }
+  .modal-card.comment-card{
+    position:relative;
+    width:min(620px, 92vw);
+    text-align:left;
+    padding:34px 32px 26px;
+  }
+  .modal-x-round{
+    position:absolute;
+    top:-14px; right:-14px;
+    width:40px; height:40px;
+    border-radius:50%;
+    border:none;
+    background: #e34b4b;
+    color:#fff;
+    font-size:17px;
+    line-height:1;
+    cursor:pointer;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+    transition: transform .15s ease;
+  }
+  .modal-x-round:hover{ transform: scale(1.08); }
+
+  .comment-option-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  .comment-radio-label{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:"Fraunces", serif;
+    font-size:17px;
+    font-weight:700;
+    color: var(--ink);
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .comment-radio-label input[type="radio"]{
+    width:19px; height:19px;
+    accent-color: var(--ink);
+    cursor:pointer;
+  }
+  .comment-option-row.is-disabled .comment-radio-label{
+    opacity:.4;
+  }
+  #commentZoneSelect, #commentItemSelect{
+    font-family:"Noto Sans TC",sans-serif;
+    font-size:13.5px;
+    font-weight:700;
+    padding:9px 12px;
+    border-radius:10px;
+    border: 2px solid #e1d5be;
+    background: #fffdf9;
+    color: var(--ink);
+    cursor:pointer;
+  }
+  #commentZoneSelect:disabled, #commentItemSelect:disabled{
+    opacity:.4;
+    background:#eee6d6;
+    cursor:not-allowed;
+  }
+
+  #commentTextarea{
+    width:100%;
+    min-height:150px;
+    font-family:"Noto Sans TC",sans-serif;
+    font-size:14px;
+    line-height:1.7;
+    padding:14px 16px;
+    border-radius:12px;
+    border: 2px solid #e1d5be;
+    background: #fffdf9;
+    outline:none;
+    resize:vertical;
+    transition: border-color .2s ease;
+  }
+  #commentTextarea:focus{ border-color: var(--coral-deep); }
+
+  .comment-footer{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    margin-top:16px;
+    flex-wrap:wrap;
+  }
+  .comment-hint{
+    margin:0;
+    font-size:12px;
+    color: var(--ink-soft);
+    flex:1;
+    min-width:160px;
+  }
+  .comment-actions{ display:flex; gap:10px; flex-shrink:0; }
+  .comment-btn{
+    font-family:"Noto Sans TC",sans-serif;
+    font-weight:700;
+    font-size:14px;
+    padding:11px 22px;
+    border-radius:10px;
+    border:none;
+    cursor:pointer;
+    transition: transform .15s ease, filter .15s ease;
+  }
+  .comment-btn:hover{ transform: translateY(-1px); filter:brightness(1.05); }
+  .comment-btn.clear{ background: #e8c93f; color: var(--ink); }
+  .comment-btn.submit{ background: #6fae3f; color:#fff; }
+
+  @media (max-width: 720px){
+    .modal-card.comment-card{ padding:30px 20px 22px; }
+    .modal-x-round{ top:-10px; right:-10px; width:34px; height:34px; font-size:14px; }
+  }
+  .modal-card input.shake, .modal-card textarea.shake{ animation: shake .35s ease; border-color: var(--coral-deep); }
   @keyframes shake{
     0%,100%{ transform: translateX(0); }
     25%{ transform: translateX(-6px); }
@@ -889,6 +1016,55 @@
 
   /* -------- Stats modal (物品清單): header, tabs, item rows -------- */
   .modal-card.stats-card{ width:min(560px, 94vw); text-align:left; }
+
+  /* -------- Changelog (更新日誌) -------- */
+  .modal-card.changelog-card{ width:min(480px, 94vw); text-align:left; }
+  #changelogSearchInput{
+    margin:14px 0 10px;
+    font-size:14px;
+    padding:10px 14px;
+  }
+  .changelog-list{
+    list-style:none;
+    margin:0;
+    padding:0;
+    max-height:min(50vh, 380px);
+    overflow-y:auto;
+    background:#fbf3e2;
+    border-radius:12px;
+    padding:6px 14px;
+  }
+  .changelog-list li{
+    padding:12px 0;
+    border-bottom:1px solid #eee0c9;
+  }
+  .changelog-list li:last-child{ border-bottom:none; }
+  .changelog-list .changelog-date{
+    font-size:11px;
+    font-weight:700;
+    color: var(--coral-deep);
+    letter-spacing:.04em;
+  }
+  .changelog-list .changelog-title{
+    display:block;
+    font-family:"Fraunces", serif;
+    font-weight:700;
+    font-size:15px;
+    color: var(--ink);
+    margin:2px 0 4px;
+  }
+  .changelog-list .changelog-content{
+    font-size:13px;
+    line-height:1.7;
+    color: var(--ink-soft);
+    white-space:pre-wrap;
+  }
+  .changelog-empty{
+    text-align:center;
+    font-size:13px;
+    color: var(--ink-soft);
+    padding:24px 0;
+  }
 
   .stats-card-header{
     display:flex;
@@ -1327,7 +1503,7 @@
       </div>
 
       <div class="center-col">
-        <button class="board-btn" id="boardBtn" type="button">留言板</button>
+        <button class="board-btn" id="boardBtn" type="button">更新日誌</button>
 
         <button class="door-wrap" id="doorWrap" type="button" aria-label="點擊房門，進入房間">
           <div class="door-glow" aria-hidden="true"></div>
@@ -1399,6 +1575,21 @@
         <button id="cancelBtn" type="button">取消</button>
         <button id="confirmBtn" type="button">確認</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Changelog (更新日誌) -->
+  <div class="modal-overlay" id="changelogModalOverlay" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
+    <div class="modal-card changelog-card">
+      <div class="stats-card-header">
+        <div>
+          <h2 id="changelogTitle">更新日誌</h2>
+          <p>這個小房間的更新紀錄</p>
+        </div>
+        <button class="modal-x" id="changelogCloseBtn" type="button" aria-label="關閉">✕</button>
+      </div>
+      <input id="changelogSearchInput" type="text" placeholder="搜尋標題或內容…" autocomplete="off">
+      <ul class="changelog-list" id="changelogList"></ul>
     </div>
   </div>
 
@@ -1579,6 +1770,56 @@
     </div>
   </div>
 
+  <!-- Nickname prompt (first time opening the comment modal) -->
+  <div class="modal-overlay" id="nicknameModalOverlay" role="dialog" aria-modal="true" aria-labelledby="nicknameModalTitle">
+    <div class="modal-card">
+      <h2 id="nicknameModalTitle">您的暱稱/名字</h2>
+      <p>留言前先告訴房間你是誰</p>
+      <input id="nicknameInput" type="text" placeholder="你的暱稱" maxlength="12" autocomplete="off">
+      <div class="modal-actions">
+        <button id="nicknameCancelBtn" type="button">取消</button>
+        <button id="nicknameConfirmBtn" type="button">確認</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comment modal (3D room) -->
+  <div class="modal-overlay comment-overlay" id="commentModalOverlay" role="dialog" aria-modal="true" aria-labelledby="commentModalTitle">
+    <div class="modal-card comment-card">
+      <button class="modal-x-round" id="commentCloseBtn" type="button" aria-label="關閉">✕</button>
+      <h2 id="commentModalTitle" class="sr-only">留言</h2>
+
+      <div class="comment-option-row" id="commentGeneralRow">
+        <label class="comment-radio-label" id="commentGeneralLabel">
+          <input type="radio" name="commentCategory" id="commentCategoryGeneral" value="general" checked>
+          一般建議
+        </label>
+      </div>
+      <div class="comment-option-row" id="commentItemRow">
+        <label class="comment-radio-label" id="commentItemLabel">
+          <input type="radio" name="commentCategory" id="commentCategoryItem" value="item">
+          針對物品留言
+        </label>
+        <select id="commentZoneSelect" disabled>
+          <option value="">區域</option>
+        </select>
+        <select id="commentItemSelect" disabled>
+          <option value="">物品</option>
+        </select>
+      </div>
+
+      <textarea id="commentTextarea" placeholder="想說的話都可以寫在這裡……" rows="7"></textarea>
+
+      <div class="comment-footer">
+        <p class="comment-hint">您的留言將會出現在更新日誌回復</p>
+        <div class="comment-actions">
+          <button class="comment-btn clear" id="commentClearBtn" type="button">清空</button>
+          <button class="comment-btn submit" id="commentSubmitBtn" type="button">送出</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ============================================================
        Three.js (loaded from cdnjs; safe to swap versions)
   ============================================================= -->
@@ -1604,8 +1845,96 @@
     toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2200);
   }
 
-  document.getElementById('boardBtn').addEventListener('click', function(){
-    showToast('留言板即將推出，敬請期待 📌');
+  /* ---------------- Changelog (更新日誌) ---------------- */
+  var changelogModalOverlay = document.getElementById('changelogModalOverlay');
+  var changelogCloseBtn = document.getElementById('changelogCloseBtn');
+  var changelogSearchInput = document.getElementById('changelogSearchInput');
+  var changelogListEl = document.getElementById('changelogList');
+  var changelogEntries = null; // null = not loaded yet
+
+  function loadChangelog(onDone){
+    if (changelogEntries){ if (onDone) onDone(changelogEntries); return; }
+    if (!GOOGLE_SHEET_API_URL){ changelogEntries = []; if (onDone) onDone(changelogEntries); return; }
+    fetch(sheetApiUrl({ action: 'getChangelog' }))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        changelogEntries = (data && data.ok && Array.isArray(data.entries)) ? data.entries : [];
+        if (onDone) onDone(changelogEntries);
+      })
+      .catch(function(err){
+        console.warn('loadChangelog failed', err);
+        changelogEntries = [];
+        if (onDone) onDone(changelogEntries);
+      });
+  }
+
+  // Builds every node via createElement + textContent — never innerHTML
+  // with sheet-sourced text — so nothing in a changelog entry can ever
+  // be interpreted as markup.
+  function renderChangelogList(filterText){
+    changelogListEl.innerHTML = '';
+    var q = (filterText || '').trim().toLowerCase();
+    var entries = changelogEntries || [];
+    var shown = entries.filter(function(e){
+      if (!q) return true;
+      return (e.title || '').toLowerCase().indexOf(q) !== -1 ||
+             (e.content || '').toLowerCase().indexOf(q) !== -1;
+    });
+
+    if (!shown.length){
+      var empty = document.createElement('li');
+      empty.className = 'changelog-empty';
+      empty.textContent = entries.length ? '找不到符合的紀錄' : '目前還沒有更新紀錄';
+      changelogListEl.appendChild(empty);
+      return;
+    }
+
+    shown.forEach(function(entry){
+      var li = document.createElement('li');
+
+      var dateEl = document.createElement('span');
+      dateEl.className = 'changelog-date';
+      dateEl.textContent = formatChangelogDate(entry.date);
+
+      var titleEl = document.createElement('span');
+      titleEl.className = 'changelog-title';
+      titleEl.textContent = entry.title || '';
+
+      var contentEl = document.createElement('p');
+      contentEl.className = 'changelog-content';
+      contentEl.textContent = entry.content || '';
+
+      li.appendChild(dateEl);
+      li.appendChild(titleEl);
+      li.appendChild(contentEl);
+      changelogListEl.appendChild(li);
+    });
+  }
+
+  function formatChangelogDate(v){
+    if (!v) return '';
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    return d.getFullYear() + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function openChangelogModal(){
+    changelogSearchInput.value = '';
+    changelogListEl.innerHTML = '<li class="changelog-empty">載入中…</li>';
+    changelogModalOverlay.classList.add('active');
+    loadChangelog(function(){ renderChangelogList(''); });
+  }
+  function closeChangelogModal(){
+    changelogModalOverlay.classList.remove('active');
+  }
+
+  document.getElementById('boardBtn').addEventListener('click', openChangelogModal);
+  changelogCloseBtn.addEventListener('click', closeChangelogModal);
+  changelogModalOverlay.addEventListener('click', function(e){
+    if (e.target === changelogModalOverlay) closeChangelogModal();
+  });
+  changelogSearchInput.addEventListener('input', function(){
+    renderChangelogList(changelogSearchInput.value);
   });
 
   /* ================================================================
@@ -2048,7 +2377,9 @@
     if (e.target === modalOverlay) closeModal();
   });
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape' && modalOverlay.classList.contains('active')) closeModal();
+    if (e.key !== 'Escape') return;
+    if (modalOverlay.classList.contains('active')) closeModal();
+    else if (changelogModalOverlay.classList.contains('active')) closeChangelogModal();
   });
   nameInput.addEventListener('keydown', function(e){
     if (e.key === 'Enter') confirmBtn.click();
@@ -3667,10 +3998,189 @@
   // to move the user forward — an accidental outside click shouldn't
   // leave them stranded on an empty stack with no summary either.
 
-  /* ---------------- Message board icon (room scene) ---------------- */
-  document.getElementById('chatIcon').addEventListener('click', function(){
-    showToast('留言區即將推出，敬請期待 💬');
+  /* ---------------- Comment modal (3D room 留言) ---------------- */
+  var NICKNAME_KEY = 'cmr_comment_nickname';
+  function getCommentNickname(){ return localStorage.getItem(NICKNAME_KEY) || ''; }
+  function setCommentNickname(name){ localStorage.setItem(NICKNAME_KEY, name); }
+
+  var nicknameModalOverlay = document.getElementById('nicknameModalOverlay');
+  var nicknameInput = document.getElementById('nicknameInput');
+  var nicknameCancelBtn = document.getElementById('nicknameCancelBtn');
+  var nicknameConfirmBtn = document.getElementById('nicknameConfirmBtn');
+  var nicknamePendingCallback = null;
+
+  function openNicknamePrompt(onConfirmed){
+    nicknameInput.value = getCommentNickname() || visitorDisplayName || '';
+    nicknameModalOverlay.classList.add('active');
+    controlsPaused = true;
+    nicknamePendingCallback = onConfirmed;
+    setTimeout(function(){ nicknameInput.focus(); }, 150);
+  }
+  function closeNicknamePrompt(){
+    nicknameModalOverlay.classList.remove('active');
+    nicknamePendingCallback = null;
+    if (!commentModalOverlay.classList.contains('active')) controlsPaused = false;
+  }
+  nicknameCancelBtn.addEventListener('click', closeNicknamePrompt);
+  nicknameModalOverlay.addEventListener('click', function(e){
+    if (e.target === nicknameModalOverlay) closeNicknamePrompt();
   });
+  nicknameInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') nicknameConfirmBtn.click();
+  });
+  nicknameConfirmBtn.addEventListener('click', function(){
+    var name = nicknameInput.value.trim();
+    if (!name){
+      nicknameInput.classList.remove('shake');
+      void nicknameInput.offsetWidth;
+      nicknameInput.classList.add('shake');
+      nicknameInput.focus();
+      return;
+    }
+    setCommentNickname(name);
+    var cb = nicknamePendingCallback;
+    nicknameModalOverlay.classList.remove('active');
+    nicknamePendingCallback = null;
+    if (cb) cb();
+  });
+
+  var commentModalOverlay = document.getElementById('commentModalOverlay');
+  var commentCloseBtn = document.getElementById('commentCloseBtn');
+  var commentCategoryGeneral = document.getElementById('commentCategoryGeneral');
+  var commentCategoryItem = document.getElementById('commentCategoryItem');
+  var commentGeneralRow = document.getElementById('commentGeneralRow');
+  var commentItemRow = document.getElementById('commentItemRow');
+  var commentZoneSelect = document.getElementById('commentZoneSelect');
+  var commentItemSelect = document.getElementById('commentItemSelect');
+  var commentTextarea = document.getElementById('commentTextarea');
+  var commentClearBtn = document.getElementById('commentClearBtn');
+  var commentSubmitBtn = document.getElementById('commentSubmitBtn');
+
+  // Options built from sheetItemsCache (already loaded on page load for
+  // the swipe decks) — only zones that actually have items show up, and
+  // the dropdown shows the Chinese label while submitting the English id.
+  function populateCommentZoneOptions(){
+    commentZoneSelect.innerHTML = '';
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '區域';
+    commentZoneSelect.appendChild(placeholder);
+
+    var zoneIds = Object.keys(sheetItemsCache || {}).filter(function(id){
+      return sheetItemsCache[id] && sheetItemsCache[id].length;
+    });
+    zoneIds.forEach(function(zoneId){
+      var cfg = FURNITURE_CONFIG.find(function(c){ return c.id === zoneId; });
+      var opt = document.createElement('option');
+      opt.value = zoneId;
+      opt.textContent = cfg ? cfg.label : zoneId;
+      commentZoneSelect.appendChild(opt);
+    });
+  }
+
+  function populateCommentItemOptions(zoneId){
+    commentItemSelect.innerHTML = '';
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '物品';
+    commentItemSelect.appendChild(placeholder);
+
+    var items = (sheetItemsCache && sheetItemsCache[zoneId]) || [];
+    items.forEach(function(item){
+      var opt = document.createElement('option');
+      opt.value = item.itemName;
+      opt.textContent = item.itemName;
+      commentItemSelect.appendChild(opt);
+    });
+  }
+
+  function updateCommentCategoryState(){
+    var isItem = commentCategoryItem.checked;
+    commentGeneralRow.classList.toggle('is-disabled', isItem);
+    commentItemRow.classList.toggle('is-disabled', !isItem);
+    commentZoneSelect.disabled = !isItem;
+    commentItemSelect.disabled = !isItem || !commentZoneSelect.value;
+  }
+  commentCategoryGeneral.addEventListener('change', updateCommentCategoryState);
+  commentCategoryItem.addEventListener('change', function(){
+    if (commentZoneSelect.options.length <= 1) populateCommentZoneOptions();
+    updateCommentCategoryState();
+  });
+  commentZoneSelect.addEventListener('change', function(){
+    populateCommentItemOptions(commentZoneSelect.value);
+    commentItemSelect.disabled = !commentZoneSelect.value;
+  });
+
+  function resetCommentForm(){
+    commentCategoryGeneral.checked = true;
+    commentCategoryItem.checked = false;
+    commentTextarea.value = '';
+    commentZoneSelect.innerHTML = '<option value="">區域</option>';
+    commentItemSelect.innerHTML = '<option value="">物品</option>';
+    updateCommentCategoryState();
+  }
+  commentClearBtn.addEventListener('click', resetCommentForm);
+
+  function openCommentModal(){
+    resetCommentForm();
+    commentModalOverlay.classList.add('active');
+    controlsPaused = true;
+  }
+  function closeCommentModal(){
+    commentModalOverlay.classList.remove('active');
+    // Don't re-enable WASD/hover if some other blocking view is still
+    // open behind this one (e.g. opened the comment modal while a swipe
+    // session or furniture modal was already active).
+    var stillBlocked = (swipeScene && swipeScene.classList.contains('active')) ||
+      (furnitureModalOverlay && furnitureModalOverlay.classList.contains('active'));
+    if (!stillBlocked) controlsPaused = false;
+  }
+  commentCloseBtn.addEventListener('click', closeCommentModal);
+  commentModalOverlay.addEventListener('click', function(e){
+    if (e.target === commentModalOverlay) closeCommentModal();
+  });
+
+  commentSubmitBtn.addEventListener('click', function(){
+    var category = commentCategoryItem.checked ? 'item' : 'general';
+    var zone = category === 'item' ? commentZoneSelect.value : '';
+    var itemName = category === 'item' ? commentItemSelect.value : '';
+    var text = commentTextarea.value.trim();
+
+    if (!text){
+      commentTextarea.classList.remove('shake');
+      void commentTextarea.offsetWidth;
+      commentTextarea.classList.add('shake');
+      commentTextarea.focus();
+      return;
+    }
+    if (category === 'item' && (!zone || !itemName)){
+      showToast('請選擇區域與物品 🙏');
+      return;
+    }
+
+    var nickname = getCommentNickname() || '匿名';
+    if (GOOGLE_SHEET_API_URL){
+      fetch(sheetApiUrl({
+        action: 'addComment',
+        visitor_name: nickname,
+        category: category,
+        zone: zone,
+        item_name: itemName,
+        comment: text,
+        timestamp: new Date().toISOString()
+      })).catch(function(err){ console.warn('addComment failed', err); });
+    }
+
+    closeCommentModal();
+    showToast('謝謝你的寶貴建議😊');
+  });
+
+  function launchCommentFlow(){
+    if (!getCommentNickname()) openNicknamePrompt(openCommentModal);
+    else openCommentModal();
+  }
+
+  document.getElementById('chatIcon').addEventListener('click', launchCommentFlow);
 
   document.getElementById('resetCameraBtn').addEventListener('click', function(){
     if (roomActive) startCameraReset();
@@ -3698,6 +4208,8 @@
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape'){
       if (confirmDialogOverlay.classList.contains('active')){ closeConfirmDialog(); return; }
+      if (nicknameModalOverlay.classList.contains('active')){ closeNicknamePrompt(); return; }
+      if (commentModalOverlay.classList.contains('active')){ closeCommentModal(); return; }
       if (summaryModalOverlay.classList.contains('active')){ closeSwipeSummary(); return; }
       if (swipeScene.classList.contains('active')){ swipeCloseBtn.click(); return; }
       if (!roomActive) return;
