@@ -1023,18 +1023,20 @@
 
   /* -------- All-zones-complete banner -------- */
   .all-zones-banner{
-    position:absolute;
-    top:20px; left:50%;
-    transform: translateX(-50%);
+    position:fixed;
+    top:50%; left:50%;
+    transform: translate(-50%, -50%);
     z-index:140;
     display:none;
+    flex-direction:column;
     align-items:center;
-    gap:14px;
-    max-width:min(520px, 86vw);
+    gap:8px;
+    max-width:min(420px, 86vw);
     background: var(--paper);
-    border-radius:14px;
-    padding:14px 44px 14px 20px;
-    box-shadow: var(--shadow);
+    border-radius:18px;
+    padding:30px 32px 24px;
+    box-shadow: 0 24px 50px rgba(0,0,0,0.35);
+    text-align:center;
   }
   .all-zones-banner.visible{ display:flex; }
   .all-zones-banner p{
@@ -3113,11 +3115,14 @@
   }
 
   var exitPortalMesh = null;
+  var exitPortalGlowMeshes = [];
+  var exitPortalLight = null;
 
   // Looks for a plane named "ExitPortal" (placed at the doorway in
   // Blender) — kept invisible and non-interactive until every zone is
   // marked complete (see checkAllZonesComplete()), at which point it's
-  // revealed as the way to trigger an ending.
+  // revealed (with a pulsing glow, see updateExitPortalGlow) as the way
+  // to trigger an ending.
   function wireExitPortal(gltf){
     exitPortalMesh = gltf.scene.getObjectByName('ExitPortal') || null;
     if (!exitPortalMesh){
@@ -3125,6 +3130,32 @@
       return;
     }
     exitPortalMesh.visible = false;
+
+    // Clone materials (never mutate one this plane might share with
+    // something else in the model) and prep each for an emissive glow.
+    exitPortalGlowMeshes = [];
+    exitPortalMesh.traverse(function(o){
+      if (o.isMesh && o.material && o.material.emissive){
+        o.material = o.material.clone();
+        o.material.emissive.setHex(0xfff2c9);
+        o.material.emissiveIntensity = 0;
+        exitPortalGlowMeshes.push(o);
+      }
+    });
+
+    var center = new THREE.Vector3();
+    new THREE.Box3().setFromObject(exitPortalMesh).getCenter(center);
+    exitPortalLight = new THREE.PointLight(0xfff2c9, 0, 6);
+    exitPortalLight.position.copy(center);
+    scene.add(exitPortalLight);
+  }
+
+  // Soft breathing pulse — only runs once the portal is actually visible.
+  function updateExitPortalGlow(){
+    if (!exitPortalMesh || !exitPortalMesh.visible) return;
+    var pulse = 0.55 + Math.sin(performance.now() / 500) * 0.35; // ~0.2–0.9
+    exitPortalGlowMeshes.forEach(function(m){ m.material.emissiveIntensity = pulse; });
+    if (exitPortalLight) exitPortalLight.intensity = pulse * 1.2;
   }
 
   function pickExitPortal(){
@@ -3549,6 +3580,7 @@
         updateMovement(dt);
       }
       mixers.forEach(function(mixer){ mixer.update(dt); });
+      updateExitPortalGlow();
 
       if (!isDragging && !controlsPaused && !isCameraTransitioning){
         var hit = pickFurniture();
