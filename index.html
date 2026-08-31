@@ -1021,6 +1021,132 @@
     line-height:1.5;
   }
 
+  /* -------- All-zones-complete banner -------- */
+  .all-zones-banner{
+    position:absolute;
+    top:20px; left:50%;
+    transform: translateX(-50%);
+    z-index:140;
+    display:none;
+    align-items:center;
+    gap:14px;
+    max-width:min(520px, 86vw);
+    background: var(--paper);
+    border-radius:14px;
+    padding:14px 44px 14px 20px;
+    box-shadow: var(--shadow);
+  }
+  .all-zones-banner.visible{ display:flex; }
+  .all-zones-banner p{
+    margin:0;
+    font-size:13.5px;
+    font-weight:700;
+    color: var(--ink);
+    line-height:1.6;
+  }
+  .all-zones-banner-close{
+    position:absolute;
+    top:8px; left:8px;
+    width:24px; height:24px;
+    border-radius:50%;
+    border:none;
+    background: var(--ink);
+    color: var(--paper);
+    font-size:12px;
+    line-height:1;
+    cursor:pointer;
+  }
+
+  /* -------- TEMP-TEST ending preview buttons — remove with the block
+     in the HTML once the 3 ending scenes are finished -------- */
+  .ending-test-bar{
+    position:absolute;
+    top:20px; left:50%;
+    transform: translateX(-50%);
+    z-index:139;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background: rgba(43,35,28,0.55);
+    backdrop-filter: blur(4px);
+    border-radius:999px;
+    padding:8px 14px;
+  }
+  .ending-test-label{
+    font-size:10.5px;
+    font-weight:700;
+    color: rgba(255,255,255,0.7);
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    margin-right:2px;
+  }
+  .ending-test-bar button{
+    font-family:"Noto Sans TC",sans-serif;
+    font-weight:700;
+    font-size:12px;
+    padding:7px 14px;
+    border-radius:999px;
+    border:none;
+    background: var(--paper);
+    color: var(--ink);
+    cursor:pointer;
+    transition: transform .15s ease;
+  }
+  .ending-test-bar button:hover{ transform: translateY(-1px); background: var(--gold); }
+
+  /* -------- Ending scene (結局) -------- */
+  .ending-scene{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:60000; /* above everything, including the transition overlay's fade */
+    text-align:center;
+    padding:24px;
+  }
+  .ending-scene.active{ display:flex; }
+  .ending-scene.ending-forest{ background: linear-gradient(160deg, #2f4d33 0%, #6b8f5a 55%, #cfe0a9 100%); }
+  .ending-scene.ending-lake{ background: linear-gradient(160deg, #223a4d 0%, #3f6d8f 55%, #bcdcea 100%); }
+  .ending-scene.ending-stream{ background: linear-gradient(160deg, #2e5350 0%, #4f8f86 55%, #cdeadf 100%); }
+  .ending-content{ max-width:520px; }
+  .ending-content h1{
+    font-family:"Fraunces", serif;
+    font-style:italic;
+    font-weight:800;
+    font-size: clamp(32px, 6vw, 52px);
+    color:#fff;
+    margin:0 0 14px;
+    text-shadow: 0 4px 18px rgba(0,0,0,0.25);
+  }
+  .ending-flavor{
+    font-size:15px;
+    line-height:1.9;
+    color: rgba(255,255,255,0.92);
+    margin:0 0 28px;
+  }
+  .ending-stats{
+    font-size:12.5px;
+    font-weight:700;
+    letter-spacing:.03em;
+    color: rgba(255,255,255,0.75);
+    margin:0 0 32px;
+  }
+  .ending-home-btn{
+    font-family:"Noto Sans TC",sans-serif;
+    font-weight:700;
+    font-size:14px;
+    padding:13px 32px;
+    border-radius:999px;
+    border:none;
+    background: rgba(255,255,255,0.92);
+    color: var(--ink);
+    cursor:pointer;
+    box-shadow: 0 10px 26px rgba(0,0,0,0.25);
+    transition: transform .15s ease;
+  }
+  .ending-home-btn:hover{ transform: translateY(-2px); }
+
   /* -------- Stats modal (物品清單): header, tabs, item rows -------- */
   .modal-card.stats-card{ width:min(560px, 94vw); text-align:left; }
 
@@ -1609,9 +1735,34 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- ================= Ending scene (結局) ================= -->
+  <div class="ending-scene" id="endingScene">
+    <div class="ending-content">
+      <h1 id="endingTitle"></h1>
+      <p class="ending-flavor" id="endingFlavor"></p>
+      <p class="ending-stats" id="endingStats"></p>
+      <button class="ending-home-btn" id="endingHomeBtn" type="button">回到主頁</button>
+    </div>
+  </div>
+
   <!-- ================= 3D ROOM SCENE ================= -->
   <div class="room-scene" id="roomScene">
     <canvas id="roomCanvas"></canvas>
+
+    <div class="all-zones-banner" id="allZonesBanner">
+      <button class="all-zones-banner-close" id="allZonesBannerClose" type="button" aria-label="關閉">✕</button>
+      <p>你已完成所有篩選，謝謝你！可以離開迎接結局，或繼續篩選。</p>
+    </div>
+
+    <!-- TEMP-TEST — remove this whole block once the 3 ending scenes are
+         finished (see chat). Lets you preview each ending without having
+         to finish all 7 zones every time. -->
+    <div class="ending-test-bar" id="endingTestBar">
+      <span class="ending-test-label">測試用</span>
+      <button type="button" data-ending="forest">森林</button>
+      <button type="button" data-ending="lake">湖泊</button>
+      <button type="button" data-ending="stream">溪邊</button>
+    </div>
 
     <div class="room-loading" id="roomLoading">
       <div class="room-loading-spinner"></div>
@@ -2173,6 +2324,35 @@
   var GOOGLE_SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbzGSQMvkXzLRNS7StNaWwZVzXI1sdC5EKMVlH6K9WK50nScD-ray0yG2Q5PWP2AU_u9/exec';
 
   var completedZones = []; // ids accumulate here for the life of this visit, e.g. ['desk','bed']
+  var sessionKeepCount = 0;
+  var sessionDiscardCount = 0;
+
+  // ---------------------------------------------------------------
+  // Ending decision — based on the running keep/discard ratio across
+  // every zone swiped this session. keepRatio = keep / (keep + discard).
+  //   >= KEEP_THRESHOLD        → forest (kept a majority)
+  //   <= DISCARD_THRESHOLD     → lake   (discarded a majority)
+  //   in between               → stream (balanced)
+  // Tune the two thresholds here if forest/lake should trigger more or
+  // less easily — they don't have to be symmetric around 0.5.
+  // ---------------------------------------------------------------
+  var ENDING_KEEP_THRESHOLD = 0.55;
+  var ENDING_DISCARD_THRESHOLD = 0.45;
+
+  var ENDING_CONFIG = {
+    forest: { label: '森林鞦韆', theme: 'ending-forest', flavor: '留下的，都是你想繼續帶在身邊的重量。', modelPath: './assets/models/endings/forest-swing.glb' },
+    lake:   { label: '湖邊椅子', theme: 'ending-lake',   flavor: '放下之後，才看得見湖面真正的樣子。',       modelPath: './assets/models/endings/lake-chair.glb' },
+    stream: { label: '小溪涼椅', theme: 'ending-stream', flavor: '留與丟剛剛好，就像溪水，流動也停留。',       modelPath: './assets/models/endings/stream-bench.glb' }
+  };
+
+  function decideEnding(){
+    var total = sessionKeepCount + sessionDiscardCount;
+    var keepRatio = total > 0 ? sessionKeepCount / total : 0.5;
+    if (keepRatio >= ENDING_KEEP_THRESHOLD) return 'forest';
+    if (keepRatio <= ENDING_DISCARD_THRESHOLD) return 'lake';
+    return 'stream';
+  }
+
 
   function markZoneCompleted(zoneId){
     if (completedZones.indexOf(zoneId) === -1) completedZones.push(zoneId);
@@ -2841,6 +3021,7 @@
         wireLoadedFurniture(gltf);
         wireDefaultCamera(gltf);
         wireModelAnimations(gltf);
+        wireExitPortal(gltf);
         computeRoomBounds(gltf.scene);
         showRoomLoading(false);
         if (roomActive) resetCamera(); // snap to the authored view if already inside
@@ -2929,6 +3110,37 @@
         mixers.push(mixer);
       });
     });
+  }
+
+  var exitPortalMesh = null;
+
+  // Looks for a plane named "ExitPortal" (placed at the doorway in
+  // Blender) — kept invisible and non-interactive until every zone is
+  // marked complete (see checkAllZonesComplete()), at which point it's
+  // revealed as the way to trigger an ending.
+  function wireExitPortal(gltf){
+    exitPortalMesh = gltf.scene.getObjectByName('ExitPortal') || null;
+    if (!exitPortalMesh){
+      console.warn('room.glb 裡找不到出口平面："ExitPortal"（結局功能會停用，其餘功能不受影響）');
+      return;
+    }
+    exitPortalMesh.visible = false;
+  }
+
+  function pickExitPortal(){
+    if (!exitPortalMesh || !exitPortalMesh.visible) return null;
+    raycaster.setFromCamera(mouseVec, camera);
+    var hits = raycaster.intersectObject(exitPortalMesh, true);
+    return hits.length ? exitPortalMesh : null;
+  }
+
+  function checkAllZonesComplete(){
+    var allDone = FURNITURE_CONFIG.every(function(cfg){
+      return furnitureState[cfg.id] && furnitureState[cfg.id].progress >= 100;
+    });
+    if (!allDone) return;
+    if (exitPortalMesh) exitPortalMesh.visible = true;
+    document.getElementById('allZonesBanner').classList.add('visible');
   }
 
   // Prefers a real camera authored in Blender and exported into
@@ -3172,7 +3384,8 @@
       renderer.domElement.classList.remove('dragging');
       if (!dragMoved && !controlsPaused){
         var hit = pickFurniture();
-        if (hit) openFurnitureModal(hit);
+        if (hit){ openFurnitureModal(hit); return; }
+        if (pickExitPortal()) openExitPortalConfirm();
       }
     }
   }
@@ -3843,6 +4056,7 @@
     var flownEl = slotEls[0];
 
     recordSwipeDecision(item, direction);
+    if (direction === 'keep') sessionKeepCount++; else sessionDiscardCount++;
 
     try {
       flownEl.classList.remove('swipe-slot-0');
@@ -3993,6 +4207,7 @@
     refreshZoneRow(zoneId);
     markZoneCompleted(zoneId);
     sendRecordToSheet({ last_completed_zone: zoneId });
+    checkAllZonesComplete();
     closeSwipeSummary();
     closeSwipeSession();
     showToast('『' + (cfg ? cfg.label : '') + '』整理完成，已標記為已整理 100% ✅');
@@ -4138,6 +4353,80 @@
 
   document.getElementById('resetCameraBtn').addEventListener('click', function(){
     if (roomActive) startCameraReset();
+  });
+
+  /* ---------------- Ending scene (結局) ---------------- */
+  var endingSceneEl = document.getElementById('endingScene');
+  var endingTitleEl = document.getElementById('endingTitle');
+  var endingFlavorEl = document.getElementById('endingFlavor');
+  var endingStatsEl = document.getElementById('endingStats');
+  var endingHomeBtn = document.getElementById('endingHomeBtn');
+
+  function openExitPortalConfirm(){
+    openConfirmDialog({
+      title: '要離開房間嗎？',
+      desc: '你的選擇會帶你走向不同的結局，離開後就不能再回來繼續整理囉。',
+      confirmText: '離開',
+      cancelText: '再想想',
+      onConfirm: function(){ enterEndingScene(decideEnding()); }
+    });
+  }
+
+  // Reuses the same fullscreen black-fade transition as leaving the room
+  // (see playExit) — grows to cover the screen, swaps what's visible
+  // underneath, then fades back out.
+  function enterEndingScene(endingId){
+    if (isTransitioning) return;
+    var cfg = ENDING_CONFIG[endingId];
+    if (!cfg) return;
+
+    var total = sessionKeepCount + sessionDiscardCount;
+    var keepPct = total > 0 ? Math.round(sessionKeepCount / total * 100) : 0;
+
+    sendRecordToSheet({ keep_count: sessionKeepCount, discard_count: sessionDiscardCount, ending: endingId });
+
+    endingSceneEl.className = 'ending-scene ' + cfg.theme;
+    endingTitleEl.textContent = cfg.label;
+    endingFlavorEl.textContent = cfg.flavor;
+    endingStatsEl.textContent = total > 0
+      ? ('留下 ' + sessionKeepCount + ' 件・丟掉 ' + sessionDiscardCount + ' 件（留下比例 ' + keepPct + '%）')
+      : '';
+
+    isTransitioning = true;
+    requestAnimationFrame(function(){ transitionCircle.classList.add('grow'); });
+    setTimeout(function(){
+      leaveRoomScene();
+      endingSceneEl.classList.add('active');
+    }, 750);
+    setTimeout(function(){
+      transitionCircle.classList.remove('grow');
+      isTransitioning = false;
+    }, 1150);
+  }
+
+  endingHomeBtn.addEventListener('click', function(){
+    if (isTransitioning) return;
+    isTransitioning = true;
+    requestAnimationFrame(function(){ transitionCircle.classList.add('grow'); });
+    setTimeout(function(){
+      endingSceneEl.classList.remove('active');
+      sceneEl.style.display = '';
+      AudioManager.crossfadeToLanding();
+    }, 750);
+    setTimeout(function(){
+      transitionCircle.classList.remove('grow');
+      isTransitioning = false;
+    }, 1150);
+  });
+
+  document.getElementById('allZonesBannerClose').addEventListener('click', function(){
+    document.getElementById('allZonesBanner').classList.remove('visible');
+  });
+
+  // TEMP-TEST — remove this whole block (and the matching HTML block
+  // marked TEMP-TEST) once the 3 ending scenes are finished.
+  Array.prototype.forEach.call(document.querySelectorAll('#endingTestBar button[data-ending]'), function(btn){
+    btn.addEventListener('click', function(){ enterEndingScene(btn.getAttribute('data-ending')); });
   });
 
   /* ---------------- Home icon (leave room) ---------------- */
