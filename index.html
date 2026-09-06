@@ -769,6 +769,14 @@
     z-index:60;
     width:180px;
   }
+  /* Ending scenes reuse this same 3D viewport, but the room-specific
+     furniture minimap/zone list and the completion banner/test bar
+     don't apply there. */
+  .room-scene.ending-mode .room-hud-left,
+  .room-scene.ending-mode .all-zones-banner,
+  .room-scene.ending-mode .ending-test-bar{
+    display:none !important;
+  }
 
   .room-logo{
     font-family:"Fraunces", serif;
@@ -1349,6 +1357,18 @@
   }
 
   .modal-actions.single button{ flex:none; width:100%; }
+  .modal-card.letter-card{ text-align:left; }
+  .letter-body{
+    white-space:pre-wrap;
+    text-align:left;
+    line-height:1.9;
+    font-size:14px;
+    color: var(--ink-soft);
+    max-height:min(300px, 40vh);
+    overflow-y:auto;
+    margin:0 0 20px;
+    padding:2px 2px 2px 0;
+  }
 
   /* ================= Swipe (斷捨離) scene ================= */
   .swipe-scene{
@@ -1875,6 +1895,17 @@
     </div>
   </div>
 
+  <!-- Letter (結局場景裡可互動查看的信件) -->
+  <div class="modal-overlay" id="letterModalOverlay" role="dialog" aria-modal="true" aria-labelledby="letterModalTitle">
+    <div class="modal-card letter-card">
+      <h2 id="letterModalTitle">一封信</h2>
+      <p class="letter-body" id="letterModalBody"></p>
+      <div class="modal-actions single">
+        <button id="letterCloseBtn" type="button">關閉</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= Swipe (斷捨離) scene ================= -->
   <div class="swipe-scene" id="swipeScene">
     <div class="swipe-topbar">
@@ -2343,9 +2374,24 @@
   var ENDING_DISCARD_THRESHOLD = 0.45;
 
   var ENDING_CONFIG = {
-    forest: { label: '森林鞦韆', theme: 'ending-forest', flavor: '留下的，都是你想繼續帶在身邊的重量。', modelPath: './assets/models/endings/forest-swing.glb' },
-    lake:   { label: '湖邊椅子', theme: 'ending-lake',   flavor: '放下之後，才看得見湖面真正的樣子。',       modelPath: './assets/models/endings/lake-chair.glb' },
-    stream: { label: '小溪涼椅', theme: 'ending-stream', flavor: '留與丟剛剛好，就像溪水，流動也停留。',       modelPath: './assets/models/endings/stream-bench.glb' }
+    forest: {
+      label: '森林鞦韆', theme: 'ending-forest',
+      flavor: '留下的，都是你想繼續帶在身邊的重量。',
+      modelPath: './assets/models/endings/forest-swing.glb',
+      letterContent: '（這裡放森林鞦韆結局的信件內容——之後在 ENDING_CONFIG.forest.letterContent 這裡直接改文字就好，不用動其他程式碼。）'
+    },
+    lake: {
+      label: '湖邊椅子', theme: 'ending-lake',
+      flavor: '放下之後，才看得見湖面真正的樣子。',
+      modelPath: './assets/models/endings/lake-chair.glb',
+      letterContent: '（湖邊椅子結局如果之後也想放信件，內容寫在這裡。）'
+    },
+    stream: {
+      label: '小溪涼椅', theme: 'ending-stream',
+      flavor: '留與丟剛剛好，就像溪水，流動也停留。',
+      modelPath: './assets/models/endings/stream-bench.glb',
+      letterContent: '（小溪涼椅結局如果之後也想放信件，內容寫在這裡。）'
+    }
   };
 
   function decideEnding(){
@@ -3021,6 +3067,7 @@
       function onLoad(gltf){
         scene.add(gltf.scene);
         collidableRoot = gltf.scene; // walls + furniture now block WASD movement (see updateMovement)
+        currentSceneKey = 'room';
         wireLoadedFurniture(gltf);
         wireDefaultCamera(gltf);
         wireModelAnimations(gltf);
@@ -3051,6 +3098,102 @@
         showRoomLoadError();
       }
     );
+  }
+
+  // ------------------------------------------------------------------
+  // Ending scene loader — mirrors loadRoomModel() above but points at
+  // one of the ENDING_CONFIG .glb files, and wires ending-specific
+  // interactives (Letter_Interactive) and runtime grass/tree instancing
+  // (see scatterInstancesOnSurface) instead of furniture/ExitPortal.
+  // Reuses the SAME renderer/scene/camera as the room — clears out
+  // whatever was loaded before (room or a different ending) first.
+  // ------------------------------------------------------------------
+  function loadEndingModel(cfg){
+    showRoomLoading(true, 0);
+    hideRoomLoadError();
+
+    if (collidableRoot){ scene.remove(collidableRoot); collidableRoot = null; }
+    if (endingGrassMesh){ scene.remove(endingGrassMesh); endingGrassMesh = null; }
+    if (endingTreeMesh){ scene.remove(endingTreeMesh); endingTreeMesh = null; }
+    furnitureMeshes.length = 0;
+    mixers.length = 0;
+    letterInteractiveMesh = null;
+    exitPortalMesh = null;
+    hovered = null;
+
+    var loader = new THREE.GLTFLoader();
+    loader.load(
+      cfg.modelPath,
+      function onLoad(gltf){
+        scene.add(gltf.scene);
+        collidableRoot = gltf.scene;
+        currentSceneKey = currentEndingId;
+        wireDefaultCamera(gltf);
+        wireModelAnimations(gltf);
+        wireEndingLetter(gltf);
+        wireEndingScatter(gltf);
+        computeRoomBounds(gltf.scene);
+        showRoomLoading(false);
+        if (roomActive) resetCamera();
+
+        var box = new THREE.Box3().setFromObject(gltf.scene);
+        console.log('[' + cfg.modelPath + '] loaded OK. Meshes:', gltf.scene.children.length,
+          '| bounds min/max:', box.min, box.max, '| spawn:', DEFAULT_SPAWN);
+      },
+      function onProgress(xhr){
+        if (xhr.lengthComputable){
+          showRoomLoading(true, Math.round((xhr.loaded / xhr.total) * 100));
+        }
+      },
+      function onError(error){
+        console.error('結局場景載入失敗（路徑：' + cfg.modelPath + '）', error);
+        showRoomLoading(false);
+        showRoomLoadError();
+      }
+    );
+  }
+
+  // Finds the clickable letter (if this ending has one) — same
+  // find-by-name pattern as ExitPortal/furniture.
+  function wireEndingLetter(gltf){
+    letterInteractiveMesh = gltf.scene.getObjectByName('Letter_Interactive') || null;
+  }
+
+  function pickLetter(){
+    if (!letterInteractiveMesh) return null;
+    raycaster.setFromCamera(mouseVec, camera);
+    var hits = raycaster.intersectObject(letterInteractiveMesh, true);
+    return hits.length ? letterInteractiveMesh : null;
+  }
+
+  // Scatters grass across Ground_ForestClearing and trees along
+  // PathBoundary using scatterInstancesOnSurface (see its definition
+  // further down) — both are optional per ending; anything not found
+  // is skipped quietly so this works for lake/stream endings that don't
+  // have grass/tree templates at all.
+  function wireEndingScatter(gltf){
+    var ground = gltf.scene.getObjectByName('Ground_ForestClearing');
+    var grassTemplate = gltf.scene.getObjectByName('GrassCard_Template');
+    if (ground && grassTemplate){
+      grassTemplate.visible = false; // only the scattered instances should render
+      endingGrassMesh = scatterInstancesOnSurface({
+        surface: ground, template: grassTemplate, count: 4000,
+        alignToNormal: true, randomScale: [0.85, 1.2]
+      });
+      if (endingGrassMesh) scene.add(endingGrassMesh);
+    }
+
+    var boundary = gltf.scene.getObjectByName('PathBoundary');
+    var treeTemplate = gltf.scene.getObjectByName('TreeCard_Template');
+    if (boundary && treeTemplate){
+      treeTemplate.visible = false;
+      boundary.visible = false; // sampling guide only, never meant to be seen
+      endingTreeMesh = scatterInstancesOnSurface({
+        surface: boundary, template: treeTemplate, count: 250,
+        alignToNormal: false, randomScale: [0.9, 1.3]
+      });
+      if (endingTreeMesh) scene.add(endingTreeMesh);
+    }
   }
 
   // Points furnitureMeshes at the real named parent objects from the
@@ -3114,6 +3257,13 @@
       });
     });
   }
+
+  var currentSceneKey = null; // 'room' | 'forest' | 'lake' | 'stream' — what's actually loaded into `scene` right now
+  var isEndingMode = false;
+  var currentEndingId = null;
+  var endingGrassMesh = null;
+  var endingTreeMesh = null;
+  var letterInteractiveMesh = null;
 
   var exitPortalMesh = null;
   var exitPortalGlowMeshes = [];
@@ -3415,9 +3565,13 @@
       isDragging = false;
       renderer.domElement.classList.remove('dragging');
       if (!dragMoved && !controlsPaused){
-        var hit = pickFurniture();
-        if (hit){ openFurnitureModal(hit); return; }
-        if (pickExitPortal()) openExitPortalConfirm();
+        if (isEndingMode){
+          if (pickLetter()) openLetterModal();
+        } else {
+          var hit = pickFurniture();
+          if (hit){ openFurnitureModal(hit); return; }
+          if (pickExitPortal()) openExitPortalConfirm();
+        }
       }
     }
   }
@@ -3581,15 +3735,15 @@
         updateMovement(dt);
       }
       mixers.forEach(function(mixer){ mixer.update(dt); });
-      updateExitPortalGlow();
+      if (!isEndingMode) updateExitPortalGlow();
 
-      if (!isDragging && !controlsPaused && !isCameraTransitioning){
+      if (!isDragging && !controlsPaused && !isCameraTransitioning && !isEndingMode){
         var hit = pickFurniture();
         setHover(hit);
         renderer.domElement.classList.toggle('hovering', !!hit);
       }
 
-      drawMinimap();
+      if (!isEndingMode) drawMinimap();
       renderer.render(scene, camera);
     } catch (err) {
       console.error('animateRoom frame failed (recovering next frame)', err);
@@ -3599,6 +3753,11 @@
   function enterRoomScene(){
     initRoomScene();
     onRoomResize();
+    isEndingMode = false;
+    document.getElementById('roomScene').classList.remove('ending-mode');
+    if (currentSceneKey !== 'room'){
+      loadRoomModel(); // an ending scene had replaced the room's content — bring it back
+    }
     resetCamera();
     setHover(null);
     document.getElementById('roomScene').classList.add('active');
@@ -3612,13 +3771,15 @@
   function leaveRoomScene(){
     roomActive = false;
     cancelAnimationFrame(rafId);
-    document.getElementById('roomScene').classList.remove('active');
+    document.getElementById('roomScene').classList.remove('active', 'ending-mode');
     document.getElementById('globalHudRight').classList.remove('visible');
     keys = {};
     isDragging = false;
     controlsPaused = false;
+    isEndingMode = false;
     closeFurnitureModal();
     closeStatsModal();
+    closeLetterModal();
     if (swipeState) closeSwipeSession();
   }
 
@@ -4478,6 +4639,25 @@
   var endingStatsEl = document.getElementById('endingStats');
   var endingHomeBtn = document.getElementById('endingHomeBtn');
 
+  var letterModalOverlay = document.getElementById('letterModalOverlay');
+  var letterModalBody = document.getElementById('letterModalBody');
+  var letterCloseBtn = document.getElementById('letterCloseBtn');
+
+  function openLetterModal(){
+    var cfg = ENDING_CONFIG[currentEndingId];
+    letterModalBody.textContent = (cfg && cfg.letterContent) || '（這封信還沒有內容。）';
+    letterModalOverlay.classList.add('active');
+    controlsPaused = true;
+  }
+  function closeLetterModal(){
+    letterModalOverlay.classList.remove('active');
+    controlsPaused = false;
+  }
+  letterCloseBtn.addEventListener('click', closeLetterModal);
+  letterModalOverlay.addEventListener('click', function(e){
+    if (e.target === letterModalOverlay) closeLetterModal();
+  });
+
   function openExitPortalConfirm(){
     openConfirmDialog({
       title: '要離開房間嗎？',
@@ -4490,29 +4670,34 @@
 
   // Reuses the same fullscreen black-fade transition as leaving the room
   // (see playExit) — grows to cover the screen, swaps what's visible
-  // underneath, then fades back out.
+  // underneath (the ending's own .glb, loaded into the SAME viewport/
+  // renderer/camera the room already uses — see loadEndingModel), then
+  // fades back out. The player can walk around with WASD exactly like
+  // in the room; the only room-specific things disabled are furniture
+  // interaction and the ExitPortal (see the isEndingMode checks in
+  // animateRoom/onCanvasMouseUp).
   function enterEndingScene(endingId){
     if (isTransitioning) return;
     var cfg = ENDING_CONFIG[endingId];
     if (!cfg) return;
 
-    var total = sessionKeepCount + sessionDiscardCount;
-    var keepPct = total > 0 ? Math.round(sessionKeepCount / total * 100) : 0;
-
     sendRecordToSheet({ keep_count: sessionKeepCount, discard_count: sessionDiscardCount, ending: endingId });
-
-    endingSceneEl.className = 'ending-scene ' + cfg.theme;
-    endingTitleEl.textContent = cfg.label;
-    endingFlavorEl.textContent = cfg.flavor;
-    endingStatsEl.textContent = total > 0
-      ? ('留下 ' + sessionKeepCount + ' 件・丟掉 ' + sessionDiscardCount + ' 件（留下比例 ' + keepPct + '%）')
-      : '';
+    currentEndingId = endingId;
 
     isTransitioning = true;
     requestAnimationFrame(function(){ transitionCircle.classList.add('grow'); });
     setTimeout(function(){
-      leaveRoomScene();
-      endingSceneEl.classList.add('active');
+      sceneEl.style.display = 'none';
+      isEndingMode = true;
+      initRoomScene(); // no-op if already initialized — guarantees renderer/scene/camera exist
+      onRoomResize();
+      document.getElementById('roomScene').classList.add('active', 'ending-mode');
+      document.getElementById('globalHudRight').classList.add('visible');
+      roomActive = true;
+      if (clock) clock.start();
+      cancelAnimationFrame(rafId);
+      animateRoom();
+      loadEndingModel(cfg);
     }, 750);
     setTimeout(function(){
       transitionCircle.classList.remove('grow');
@@ -4520,19 +4705,13 @@
     }, 1150);
   }
 
+  // The flat 2D title-card (#endingScene) is unused for now that endings
+  // load as real walkable 3D scenes — left in place/harmless in case a
+  // brief narrative title-card intro is wanted later. Its home button is
+  // wired defensively in case it's ever shown again.
   endingHomeBtn.addEventListener('click', function(){
-    if (isTransitioning) return;
-    isTransitioning = true;
-    requestAnimationFrame(function(){ transitionCircle.classList.add('grow'); });
-    setTimeout(function(){
-      endingSceneEl.classList.remove('active');
-      sceneEl.style.display = '';
-      AudioManager.crossfadeToLanding();
-    }, 750);
-    setTimeout(function(){
-      transitionCircle.classList.remove('grow');
-      isTransitioning = false;
-    }, 1150);
+    endingSceneEl.classList.remove('active');
+    handleGoHome();
   });
 
   document.getElementById('allZonesBannerClose').addEventListener('click', function(){
