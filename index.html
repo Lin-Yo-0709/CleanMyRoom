@@ -2905,6 +2905,30 @@
   // is the whole loaded model (walls + furniture), set once room.glb loads.
   var collidableRoot = null;
   var collisionRaycaster = null;
+  var groundRaycaster = null; // separate downward raycaster for terrain-following height (see sampleGroundHeight)
+  var eyeHeightOffset = 1.6;  // recomputed per scene in computeEyeHeightOffset() — how high the camera sits above the ground at its feet
+
+  // Casts straight down from well above (x,z) onto whatever's currently
+  // loaded, returning the highest hit's world Y — this is what lets the
+  // camera follow a bumpy/hilly terrain instead of staying at a fixed
+  // height (which is why walking up the forest hill wasn't working: the
+  // camera had no idea the ground was rising underneath it).
+  function sampleGroundHeight(x, z){
+    if (!collidableRoot || !groundRaycaster) return null;
+    groundRaycaster.set(new THREE.Vector3(x, 200, z), new THREE.Vector3(0, -1, 0));
+    var hits = groundRaycaster.intersectObject(collidableRoot, true);
+    return hits.length ? hits[0].point.y : null;
+  }
+
+  // Call once right after wireDefaultCamera() for whichever scene just
+  // loaded — measures how far above the ground the authored FPS_Camera
+  // sits at the spawn point, so that same eye height is preserved as the
+  // player walks across terrain at different elevations.
+  function computeEyeHeightOffset(){
+    var groundY = sampleGroundHeight(DEFAULT_SPAWN.x, DEFAULT_SPAWN.z);
+    eyeHeightOffset = (groundY != null) ? (DEFAULT_SPAWN.y - groundY) : DEFAULT_SPAWN.y;
+  }
+
   var COLLISION_BUFFER = 0.4; // meters — default stop distance
   // multi_tier_cabinet/bed = current ids for what was originally named
   // "nightstand"; long_cabinet = current id for what was "cabinet". Both
@@ -2974,6 +2998,7 @@
     // mesh if the model contains any thin/line geometry. Tighten it.
     raycaster.params.Line.threshold = 0.01;
     collisionRaycaster = new THREE.Raycaster();
+    groundRaycaster = new THREE.Raycaster();
     velocity = new THREE.Vector3(0, 0, 0);
     mouseVec = new THREE.Vector2();
     clock = new THREE.Clock();
@@ -3065,6 +3090,7 @@
 
   function loadRoomModel(){
     lastFailedLoad = loadRoomModel;
+    var myToken = ++sceneLoadToken; // see the comment on sceneLoadToken below
     showRoomLoading(true, 0);
     hideRoomLoadError();
 
@@ -3072,11 +3098,13 @@
     loader.load(
       ROOM_MODEL_PATH,
       function onLoad(gltf){
+        if (myToken !== sceneLoadToken) return; // superseded — e.g. an ending was requested while this was still loading
         scene.add(gltf.scene);
         collidableRoot = gltf.scene; // walls + furniture now block WASD movement (see updateMovement)
         currentSceneKey = 'room';
         wireLoadedFurniture(gltf);
         wireDefaultCamera(gltf);
+        computeEyeHeightOffset();
         wireModelAnimations(gltf);
         wireExitPortal(gltf);
         computeRoomBounds(gltf.scene);
@@ -3095,11 +3123,13 @@
           '| animation clips:', (gltf.animations || []).length);
       },
       function onProgress(xhr){
+        if (myToken !== sceneLoadToken) return;
         if (xhr.lengthComputable){
           showRoomLoading(true, Math.round((xhr.loaded / xhr.total) * 100));
         }
       },
       function onError(error){
+        if (myToken !== sceneLoadToken) return;
         console.error('room.glb 載入失敗（路徑：' + ROOM_MODEL_PATH + '）', error);
         showRoomLoading(false);
         showRoomLoadError(ROOM_MODEL_PATH);
@@ -3117,6 +3147,7 @@
   // ------------------------------------------------------------------
   function loadEndingModel(cfg){
     lastFailedLoad = function(){ loadEndingModel(cfg); };
+    var myToken = ++sceneLoadToken;
     showRoomLoading(true, 0);
     hideRoomLoadError();
 
@@ -3133,10 +3164,17 @@
     loader.load(
       cfg.modelPath,
       function onLoad(gltf){
+        if (myToken !== sceneLoadToken){
+          // superseded (e.g. jumped to a different ending, or back to the
+          // room) while this was still loading — do NOT touch the scene
+          console.warn('已略過過期的載入結果：' + cfg.modelPath + '（使用者已經切到別的場景）');
+          return;
+        }
         scene.add(gltf.scene);
         collidableRoot = gltf.scene;
         currentSceneKey = currentEndingId;
         wireDefaultCamera(gltf);
+        computeEyeHeightOffset();
         wireModelAnimations(gltf);
         wireEndingLetter(gltf);
         wireEndingScatter(gltf);
@@ -3149,11 +3187,13 @@
           '| bounds min/max:', box.min, box.max, '| spawn:', DEFAULT_SPAWN);
       },
       function onProgress(xhr){
+        if (myToken !== sceneLoadToken) return;
         if (xhr.lengthComputable){
           showRoomLoading(true, Math.round((xhr.loaded / xhr.total) * 100));
         }
       },
       function onError(error){
+        if (myToken !== sceneLoadToken) return;
         console.error('結局場景載入失敗（路徑：' + cfg.modelPath + '）', error);
         showRoomLoading(false);
         showRoomLoadError(cfg.modelPath);
@@ -3174,25 +3214,60 @@
     return hits.length ? letterInteractiveMesh : null;
   }
 
+  // Resolves a named object to an actual Mesh (MeshSurfaceSampler and
+  // InstancedMesh both need one, not a Group). If the name points at a
+  // Group with exactly one mesh child, that child is used silently. If
+  // it has MORE than one (e.g. a cross-card's two planes exported as two
+  // separate objects instead of being joined), only the first is used —
+  // and a warning is logged, because that's the fix: select both planes
+  // in Blender and Ctrl+J them into one object before naming/exporting.
+  function resolveSingleMesh(name, gltf){
+    var obj = gltf.scene.getObjectByName(name);
+    if (!obj){
+      console.warn('[結局場景] 找不到物件："' + name + '"（名稱要完全一致，含大小寫）');
+      return null;
+    }
+    if (obj.isMesh){
+      console.log('[結局場景] "' + name + '" 找到了 ✓');
+      return obj;
+    }
+    var meshChild = null, meshCount = 0;
+    obj.traverse(function(child){ if (child.isMesh){ meshCount++; if (!meshChild) meshChild = child; } });
+    if (meshCount === 0){
+      console.warn('[結局場景] "' + name + '" 存在，但底下沒有任何 Mesh 可以使用');
+      return null;
+    }
+    if (meshCount > 1){
+      console.warn('[結局場景] "' + name + '" 底下有 ' + meshCount + ' 個獨立的 Mesh（常見於十字交叉片的兩片平面沒合併）。目前只會用第一個 — 建議回 Blender 全選這些平面、按 Ctrl+J 合併成同一個物件，再重新命名/匯出，十字交叉的效果才會完整。');
+    }
+    console.log('[結局場景] "' + name + '" 找到了 ✓（用其中的 mesh：' + meshChild.name + '）');
+    return meshChild;
+  }
+
   // Scatters grass across Ground_ForestClearing and trees along
   // PathBoundary using scatterInstancesOnSurface (see its definition
   // further down) — both are optional per ending; anything not found
-  // is skipped quietly so this works for lake/stream endings that don't
-  // have grass/tree templates at all.
+  // is skipped (with a console warning explaining why) so this works
+  // for lake/stream endings that don't have grass/tree templates at all.
   function wireEndingScatter(gltf){
-    var ground = gltf.scene.getObjectByName('Ground_ForestClearing');
-    var grassTemplate = gltf.scene.getObjectByName('GrassCard_Template');
+    var ground = resolveSingleMesh('Ground_ForestClearing', gltf);
+    var grassTemplate = resolveSingleMesh('GrassCard_Template', gltf);
     if (ground && grassTemplate){
       grassTemplate.visible = false; // only the scattered instances should render
       endingGrassMesh = scatterInstancesOnSurface({
         surface: ground, template: grassTemplate, count: 4000,
         alignToNormal: true, randomScale: [0.85, 1.2]
       });
-      if (endingGrassMesh) scene.add(endingGrassMesh);
+      if (endingGrassMesh){
+        scene.add(endingGrassMesh);
+        console.log('[結局場景] 草皮已生成，共 ' + endingGrassMesh.count + ' 叢');
+      }
+    } else {
+      console.warn('[結局場景] 草皮沒有生成 — 需要同時存在 "Ground_ForestClearing" 與 "GrassCard_Template" 兩個物件');
     }
 
-    var boundary = gltf.scene.getObjectByName('PathBoundary');
-    var treeTemplate = gltf.scene.getObjectByName('TreeCard_Template');
+    var boundary = resolveSingleMesh('PathBoundary', gltf);
+    var treeTemplate = resolveSingleMesh('TreeCard_Template', gltf);
     if (boundary && treeTemplate){
       treeTemplate.visible = false;
       boundary.visible = false; // sampling guide only, never meant to be seen
@@ -3200,7 +3275,12 @@
         surface: boundary, template: treeTemplate, count: 250,
         alignToNormal: false, randomScale: [0.9, 1.3]
       });
-      if (endingTreeMesh) scene.add(endingTreeMesh);
+      if (endingTreeMesh){
+        scene.add(endingTreeMesh);
+        console.log('[結局場景] 路樹已生成，共 ' + endingTreeMesh.count + ' 棵');
+      }
+    } else {
+      console.warn('[結局場景] 路樹沒有生成 — 需要同時存在 "PathBoundary" 與 "TreeCard_Template" 兩個物件');
     }
   }
 
@@ -3267,6 +3347,13 @@
   }
 
   var currentSceneKey = null; // 'room' | 'forest' | 'lake' | 'stream' — what's actually loaded into `scene` right now
+  // Bumped every time a new loadRoomModel()/loadEndingModel() call starts.
+  // Each load's async callbacks capture the token's value at start time and
+  // bail out if it no longer matches — otherwise a slow room.glb load and
+  // a fast forest-swing.glb load (or vice versa) can BOTH finish and BOTH
+  // call scene.add(), silently mixing one scene's geometry into another's.
+  // This is what was causing the forest model to "leak" into the room.
+  var sceneLoadToken = 0;
   var isEndingMode = false;
   var currentEndingId = null;
   var endingGrassMesh = null;
@@ -3676,6 +3763,16 @@
       player.z += move.z;
       player.x = Math.max(ROOM_BOUNDS.minX, Math.min(ROOM_BOUNDS.maxX, player.x));
       player.z = Math.max(ROOM_BOUNDS.minZ, Math.min(ROOM_BOUNDS.maxZ, player.z));
+    }
+
+    // Follow the ground height at the player's new XZ position (the flat
+    // room floor makes this a no-op there; on a bumpy/hilly ending
+    // terrain, this is what actually lets the player walk up the hill
+    // instead of staying pinned at spawn height).
+    var groundY = sampleGroundHeight(player.x, player.z);
+    if (groundY != null){
+      var targetY = groundY + eyeHeightOffset;
+      player.y += (targetY - player.y) * Math.min(1, dt * 10);
     }
 
     camera.position.set(player.x, player.y, player.z);
