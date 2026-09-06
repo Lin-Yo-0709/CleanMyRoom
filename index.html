@@ -2924,7 +2924,7 @@
     if (!hits.length) return null;
     if (referenceY == null) return hits[0].point.y;
 
-    var tolerance = 1.0; // allows walking up a reasonably steep slope/step
+    var tolerance = 0.5; // allows walking up a gentle slope/step, but rejects anything higher (ceilings)
     for (var i = 0; i < hits.length; i++){
       if (hits[i].point.y <= referenceY + tolerance) return hits[i].point.y;
     }
@@ -3273,14 +3273,29 @@
   // further down) — both are optional per ending; anything not found
   // is skipped (with a console warning explaining why) so this works
   // for lake/stream endings that don't have grass/tree templates at all.
+  // ---- Tunable scatter settings — adjust these directly while testing ----
+  var GRASS_COUNT = 2500;           // start lower than 4000 while checking performance; raise once smooth
+  var GRASS_SCALE_RANGE = [0.85, 1.2];
+  var GRASS_ALIGN_STRENGTH = 0.4;   // 0=upright, 1=fully follows terrain tilt
+  var TREE_COUNT = 200;
+  var TREE_SCALE_RANGE = [0.9, 1.3];
+  // Flip this to true to preview true template size/orientation: forces
+  // a handful of instances with NO random scale variance (scale locked
+  // to 1.0) and no rotation, so what you see is exactly the template's
+  // real size — the fastest way to dial in size without guessing.
+  var SCATTER_PREVIEW_MODE = false;
+
   function wireEndingScatter(gltf){
     var ground = resolveSingleMesh('Ground_ForestClearing', gltf);
     var grassTemplate = resolveSingleMesh('GrassCard_Template', gltf);
     if (ground && grassTemplate){
       grassTemplate.visible = false; // only the scattered instances should render
       endingGrassMesh = scatterInstancesOnSurface({
-        surface: ground, template: grassTemplate, count: 4000,
-        alignToNormal: true, randomScale: [0.85, 1.2]
+        surface: ground, template: grassTemplate,
+        count: SCATTER_PREVIEW_MODE ? 12 : GRASS_COUNT,
+        alignToNormal: true,
+        alignStrength: SCATTER_PREVIEW_MODE ? 0 : GRASS_ALIGN_STRENGTH,
+        randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : GRASS_SCALE_RANGE
       });
       if (endingGrassMesh){
         scene.add(endingGrassMesh);
@@ -3296,8 +3311,10 @@
       treeTemplate.visible = false;
       boundary.visible = false; // sampling guide only, never meant to be seen
       endingTreeMesh = scatterInstancesOnSurface({
-        surface: boundary, template: treeTemplate, count: 250,
-        alignToNormal: false, randomScale: [0.9, 1.3]
+        surface: boundary, template: treeTemplate,
+        count: SCATTER_PREVIEW_MODE ? 8 : TREE_COUNT,
+        alignToNormal: false,
+        randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : TREE_SCALE_RANGE
       });
       if (endingTreeMesh){
         scene.add(endingTreeMesh);
@@ -3796,7 +3813,16 @@
     var groundY = sampleGroundHeight(player.x, player.z, player.y);
     if (groundY != null){
       var targetY = groundY + eyeHeightOffset;
-      player.y += (targetY - player.y) * Math.min(1, dt * 10);
+      var desiredDelta = (targetY - player.y) * Math.min(1, dt * 10);
+      // Hard safety cap — independent of the tolerance heuristic above —
+      // so the camera can physically never snap upward (or downward) by
+      // more than ~6 units/sec no matter what a single frame's raycast
+      // happens to hit. A real, deliberate climb (like the forest hill)
+      // still feels smooth well under this cap; a bad sample can only
+      // ever nudge the camera gradually, never instantly to the sky.
+      var maxStep = 6 * dt;
+      desiredDelta = Math.max(-maxStep, Math.min(maxStep, desiredDelta));
+      player.y += desiredDelta;
     }
 
     camera.position.set(player.x, player.y, player.z);
@@ -4719,19 +4745,42 @@
       return null;
     }
     var alignToNormal = !!opts.alignToNormal;
+    // 0 = always upright, 1 = fully match the terrain normal at each
+    // point. Full alignment on bumpy ground makes every blade tilt with
+    // its own little bump, which reads as chaotic/messy from a distance
+    // — a partial blend keeps grass mostly upright with just a hint of
+    // "following the ground", which looks far more natural.
+    var alignStrength = opts.alignStrength != null ? opts.alignStrength : 0.4;
     var scaleRange = opts.randomScale || [1, 1];
 
     var sampler = new THREE.MeshSurfaceSampler(surface);
     if (opts.weightAttribute) sampler.setWeightAttribute(opts.weightAttribute);
     sampler.build();
 
-    var instanced = new THREE.InstancedMesh(template.geometry, template.material, count);
+    // Clone the material (never mutate the template's original — it may
+    // still be referenced elsewhere) and force the cheap alpha-cutout
+    // path. This is very likely THE fix for the fan noise: if the grass/
+    // tree texture's transparency exported as alpha BLEND (not clip),
+    // the GPU has to blend + depth-sort every one of these thousands of
+    // overlapping quads every frame, which is dramatically more
+    // expensive than a hard cutout discard.
+    var instancedMaterial = template.material.clone();
+    instancedMaterial.transparent = false;
+    instancedMaterial.alphaTest = 0.5;
+    instancedMaterial.depthWrite = true;
+    instancedMaterial.side = THREE.DoubleSide; // cross-cards need to be visible from both sides
+
+    var instanced = new THREE.InstancedMesh(template.geometry, instancedMaterial, count);
     instanced.name = (template.name || 'Instanced') + '_Scattered';
+    instanced.castShadow = false;
+    instanced.receiveShadow = false;
+    instanced.frustumCulled = false; // instances spread far from the geometry's own origin — avoid incorrect pop-in/out
 
     var position = new THREE.Vector3();
     var normal = new THREE.Vector3();
     var up = new THREE.Vector3(0, 1, 0);
     var alignQuat = new THREE.Quaternion();
+    var uprightQuat = new THREE.Quaternion(); // identity — reused as the slerp start
     var spinQuat = new THREE.Quaternion();
     var finalQuat = new THREE.Quaternion();
     var scaleVec = new THREE.Vector3();
@@ -4740,8 +4789,9 @@
     for (var i = 0; i < count; i++){
       sampler.sample(position, normal);
 
-      if (alignToNormal && normal.lengthSq() > 0){
+      if (alignToNormal && normal.lengthSq() > 0 && alignStrength > 0){
         alignQuat.setFromUnitVectors(up, normal.normalize());
+        alignQuat.copy(uprightQuat).slerp(alignQuat, alignStrength);
       } else {
         alignQuat.identity();
       }
