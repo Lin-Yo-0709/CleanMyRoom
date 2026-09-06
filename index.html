@@ -2909,15 +2909,26 @@
   var eyeHeightOffset = 1.6;  // recomputed per scene in computeEyeHeightOffset() — how high the camera sits above the ground at its feet
 
   // Casts straight down from well above (x,z) onto whatever's currently
-  // loaded, returning the highest hit's world Y — this is what lets the
-  // camera follow a bumpy/hilly terrain instead of staying at a fixed
-  // height (which is why walking up the forest hill wasn't working: the
-  // camera had no idea the ground was rising underneath it).
-  function sampleGroundHeight(x, z){
+  // loaded, returning a plausible ground height. If referenceY is given,
+  // hits more than `tolerance` above it are skipped — without this, a
+  // ceiling (which sits closer to the ray's high starting point than the
+  // actual floor below it) gets mistaken for "the ground", which is why
+  // the camera was climbing up onto ceilings. referenceY is omitted for
+  // the one-time spawn calibration (see computeEyeHeightOffset), where
+  // there's no "current position" yet to compare against — the highest
+  // surface at the authored spawn point is trusted there.
+  function sampleGroundHeight(x, z, referenceY){
     if (!collidableRoot || !groundRaycaster) return null;
     groundRaycaster.set(new THREE.Vector3(x, 200, z), new THREE.Vector3(0, -1, 0));
     var hits = groundRaycaster.intersectObject(collidableRoot, true);
-    return hits.length ? hits[0].point.y : null;
+    if (!hits.length) return null;
+    if (referenceY == null) return hits[0].point.y;
+
+    var tolerance = 1.0; // allows walking up a reasonably steep slope/step
+    for (var i = 0; i < hits.length; i++){
+      if (hits[i].point.y <= referenceY + tolerance) return hits[i].point.y;
+    }
+    return hits[hits.length - 1].point.y; // fallback: lowest surface found
   }
 
   // Call once right after wireDefaultCamera() for whichever scene just
@@ -3093,6 +3104,19 @@
     var myToken = ++sceneLoadToken; // see the comment on sceneLoadToken below
     showRoomLoading(true, 0);
     hideRoomLoadError();
+
+    // Clear out whatever was previously loaded — this matters most when
+    // coming back from an ending: without it, the ending's model (and
+    // any scattered grass/tree InstancedMeshes) stayed in `scene`
+    // forever, silently overlapping with the room once it loaded back in.
+    if (collidableRoot){ scene.remove(collidableRoot); collidableRoot = null; }
+    if (endingGrassMesh){ scene.remove(endingGrassMesh); endingGrassMesh = null; }
+    if (endingTreeMesh){ scene.remove(endingTreeMesh); endingTreeMesh = null; }
+    furnitureMeshes.length = 0;
+    mixers.length = 0;
+    letterInteractiveMesh = null;
+    exitPortalMesh = null;
+    hovered = null;
 
     var loader = new THREE.GLTFLoader();
     loader.load(
@@ -3769,7 +3793,7 @@
     // room floor makes this a no-op there; on a bumpy/hilly ending
     // terrain, this is what actually lets the player walk up the hill
     // instead of staying pinned at spawn height).
-    var groundY = sampleGroundHeight(player.x, player.z);
+    var groundY = sampleGroundHeight(player.x, player.z, player.y);
     if (groundY != null){
       var targetY = groundY + eyeHeightOffset;
       player.y += (targetY - player.y) * Math.min(1, dt * 10);
