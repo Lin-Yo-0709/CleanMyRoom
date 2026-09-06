@@ -1792,8 +1792,8 @@
     </div>
 
     <div class="room-load-error" id="roomLoadError">
-      <p>房間模型載入失敗</p>
-      <p class="room-load-error-detail">找不到 <code>./assets/models/room.glb</code>，請確認檔案已放在正確路徑。</p>
+      <p id="roomLoadErrorTitle">房間模型載入失敗</p>
+      <p class="room-load-error-detail" id="roomLoadErrorDetail">找不到 <code>./assets/models/room.glb</code>，請確認檔案已放在正確路徑。</p>
       <button id="roomLoadRetryBtn" type="button">重試</button>
     </div>
 
@@ -3005,17 +3005,23 @@
       if (pctEl) pctEl.textContent = (percent || 0) + '%';
     }
   }
-  function showRoomLoadError(){
+  function showRoomLoadError(path){
     var el = document.getElementById('roomLoadError');
-    if (el) el.classList.add('visible');
+    if (!el) return;
+    var detailEl = document.getElementById('roomLoadErrorDetail');
+    if (detailEl && path){
+      detailEl.innerHTML = '找不到 <code>' + path.replace(/</g, '&lt;') + '</code>，請確認檔案已放在正確路徑。';
+    }
+    el.classList.add('visible');
   }
   function hideRoomLoadError(){
     var el = document.getElementById('roomLoadError');
     if (el) el.classList.remove('visible');
   }
+  var lastFailedLoad = loadRoomModel; // what "重試" should actually re-run — updated per attempt below
   var roomLoadRetryBtn = document.getElementById('roomLoadRetryBtn');
   if (roomLoadRetryBtn){
-    roomLoadRetryBtn.addEventListener('click', function(){ loadRoomModel(); });
+    roomLoadRetryBtn.addEventListener('click', function(){ lastFailedLoad(); });
   }
 
   var HDRI_PATH = './assets/hdri/sky-clouds-1k.exr';
@@ -3058,6 +3064,7 @@
   }
 
   function loadRoomModel(){
+    lastFailedLoad = loadRoomModel;
     showRoomLoading(true, 0);
     hideRoomLoadError();
 
@@ -3095,7 +3102,7 @@
       function onError(error){
         console.error('room.glb 載入失敗（路徑：' + ROOM_MODEL_PATH + '）', error);
         showRoomLoading(false);
-        showRoomLoadError();
+        showRoomLoadError(ROOM_MODEL_PATH);
       }
     );
   }
@@ -3109,6 +3116,7 @@
   // whatever was loaded before (room or a different ending) first.
   // ------------------------------------------------------------------
   function loadEndingModel(cfg){
+    lastFailedLoad = function(){ loadEndingModel(cfg); };
     showRoomLoading(true, 0);
     hideRoomLoadError();
 
@@ -3148,7 +3156,7 @@
       function onError(error){
         console.error('結局場景載入失敗（路徑：' + cfg.modelPath + '）', error);
         showRoomLoading(false);
-        showRoomLoadError();
+        showRoomLoadError(cfg.modelPath);
       }
     );
   }
