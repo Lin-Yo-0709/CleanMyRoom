@@ -2924,7 +2924,7 @@
     if (!hits.length) return null;
     if (referenceY == null) return hits[0].point.y;
 
-    var tolerance = 0.5; // allows walking up a gentle slope/step, but rejects anything higher (ceilings)
+    var tolerance = 0.2; // allows walking up a gentle slope/step, but rejects anything higher (ceilings)
     for (var i = 0; i < hits.length; i++){
       if (hits[i].point.y <= referenceY + tolerance) return hits[i].point.y;
     }
@@ -3268,6 +3268,20 @@
     return meshChild;
   }
 
+  // Logs a mesh's real-world footprint — paste this line if the grass/
+  // trees still look wrong: a "PathBoundary" whose X/Z size is nearly as
+  // big as the whole ground means it's a broad area, not a narrow strip
+  // tracing the path, which is why trees would spread out everywhere
+  // instead of forming a clean fence along one route.
+  function logMeshFootprint(label, mesh){
+    if (!mesh) return;
+    var box = new THREE.Box3().setFromObject(mesh);
+    var size = new THREE.Vector3();
+    box.getSize(size);
+    console.log('[結局場景] ' + label + ' 實際尺寸 X/Y/Z：',
+      size.x.toFixed(2), size.y.toFixed(2), size.z.toFixed(2));
+  }
+
   // Scatters grass across Ground_ForestClearing and trees along
   // PathBoundary using scatterInstancesOnSurface (see its definition
   // further down) — both are optional per ending; anything not found
@@ -3288,6 +3302,8 @@
   function wireEndingScatter(gltf){
     var ground = resolveSingleMesh('Ground_ForestClearing', gltf);
     var grassTemplate = resolveSingleMesh('GrassCard_Template', gltf);
+    logMeshFootprint('Ground_ForestClearing', ground);
+    logMeshFootprint('GrassCard_Template', grassTemplate);
     if (ground && grassTemplate){
       grassTemplate.visible = false; // only the scattered instances should render
       endingGrassMesh = scatterInstancesOnSurface({
@@ -3295,7 +3311,13 @@
         count: SCATTER_PREVIEW_MODE ? 12 : GRASS_COUNT,
         alignToNormal: true,
         alignStrength: SCATTER_PREVIEW_MODE ? 0 : GRASS_ALIGN_STRENGTH,
-        randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : GRASS_SCALE_RANGE
+        randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : GRASS_SCALE_RANGE,
+        // If you vertex-paint Ground_ForestClearing in Blender (white =
+        // grass allowed, black = keep clear, e.g. paint the walking
+        // path black), this automatically keeps grass off the path —
+        // harmless no-op if you haven't painted anything yet (falls
+        // back to uniform coverage).
+        weightAttribute: 'color'
       });
       if (endingGrassMesh){
         scene.add(endingGrassMesh);
@@ -3307,6 +3329,8 @@
 
     var boundary = resolveSingleMesh('PathBoundary', gltf);
     var treeTemplate = resolveSingleMesh('TreeCard_Template', gltf);
+    logMeshFootprint('PathBoundary', boundary);
+    logMeshFootprint('TreeCard_Template', treeTemplate);
     if (boundary && treeTemplate){
       treeTemplate.visible = false;
       boundary.visible = false; // sampling guide only, never meant to be seen
@@ -4754,7 +4778,13 @@
     var scaleRange = opts.randomScale || [1, 1];
 
     var sampler = new THREE.MeshSurfaceSampler(surface);
-    if (opts.weightAttribute) sampler.setWeightAttribute(opts.weightAttribute);
+    if (opts.weightAttribute){
+      if (surface.geometry.getAttribute(opts.weightAttribute)){
+        sampler.setWeightAttribute(opts.weightAttribute);
+      } else {
+        console.log('scatterInstancesOnSurface: "' + surface.name + '" 沒有 "' + opts.weightAttribute + '" 頂點屬性，先用均勻分布（如果你有在 Blender 頂點上色，確認有存到匯出檔裡）');
+      }
+    }
     sampler.build();
 
     // Clone the material (never mutate the template's original — it may
