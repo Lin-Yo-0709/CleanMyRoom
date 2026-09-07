@@ -4844,11 +4844,23 @@
     var scaleVec = new THREE.Vector3();
     var matrix = new THREE.Matrix4();
 
+    // MeshSurfaceSampler works entirely in the surface mesh's own LOCAL
+    // geometry space — it has no idea where that mesh actually sits in
+    // the scene. Without converting each sampled point through the
+    // surface's world matrix, every instance lands near the surface
+    // object's local origin instead of wherever you actually moved/
+    // placed it in Blender (this was the "trees always cluster at the
+    // center, no matter where I move PathBoundary" bug).
+    surface.updateWorldMatrix(true, false);
+    var normalMatrix = new THREE.Matrix3().getNormalMatrix(surface.matrixWorld);
+
     for (var i = 0; i < count; i++){
       sampler.sample(position, normal);
+      position.applyMatrix4(surface.matrixWorld);
+      normal.applyMatrix3(normalMatrix).normalize();
 
       if (alignToNormal && normal.lengthSq() > 0 && alignStrength > 0){
-        alignQuat.setFromUnitVectors(up, normal.normalize());
+        alignQuat.setFromUnitVectors(up, normal);
         alignQuat.copy(uprightQuat).slerp(alignQuat, alignStrength);
       } else {
         alignQuat.identity();
