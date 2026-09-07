@@ -3289,14 +3289,32 @@
   // for lake/stream endings that don't have grass/tree templates at all.
   // ---- Tunable scatter settings — adjust these directly while testing ----
   var GRASS_COUNT = 2500;           // start lower than 4000 while checking performance; raise once smooth
-  var GRASS_SCALE_RANGE = [0.85, 1.2];
+  // Your GrassCard_Template is coming in far too large (screenshot shows
+  // grass nearly as tall as the background trees). Instead of a slow
+  // Blender → re-export → re-upload loop for every size guess, tune this
+  // multiplier here first — it's applied on TOP of GRASS_SCALE_RANGE
+  // below, so 0.15 means "shrink the template to ~15% of its exported
+  // size". Once you land on a number that looks right, you can optionally
+  // bake that same shrink into the actual Blender object later — but you
+  // don't have to; this is a fully working permanent fix on its own.
+  var GRASS_BASE_SCALE = 0.15;
+  var GRASS_SCALE_RANGE = [0.85, 1.2];  // random variance multiplied on top of GRASS_BASE_SCALE
   var GRASS_ALIGN_STRENGTH = 0.4;   // 0=upright, 1=fully follows terrain tilt
   var TREE_COUNT = 200;
+  var TREE_BASE_SCALE = 1.0;        // same idea as GRASS_BASE_SCALE, in case TreeCard_Template needs it too
   var TREE_SCALE_RANGE = [0.9, 1.3];
+  // 0.5 is a hard black/white cutoff — if your grass texture's alpha
+  // channel has soft/gradient edges rather than a crisp silhouette, that
+  // cutoff can leave jagged, spiky-looking edges (this is very likely
+  // what's causing the ragged edges in your screenshot). Try nudging
+  // this down (e.g. 0.3) if edges look torn, or up (e.g. 0.7) if you see
+  // a faint transparent halo instead.
+  var SCATTER_ALPHA_TEST = 0.5;
   // Flip this to true to preview true template size/orientation: forces
   // a handful of instances with NO random scale variance (scale locked
-  // to 1.0) and no rotation, so what you see is exactly the template's
-  // real size — the fastest way to dial in size without guessing.
+  // to GRASS_BASE_SCALE/TREE_BASE_SCALE exactly) and no rotation, so
+  // what you see is exactly the template's real size — the fastest way
+  // to dial in size without guessing.
   var SCATTER_PREVIEW_MODE = false;
 
   function wireEndingScatter(gltf){
@@ -3311,7 +3329,9 @@
         count: SCATTER_PREVIEW_MODE ? 12 : GRASS_COUNT,
         alignToNormal: true,
         alignStrength: SCATTER_PREVIEW_MODE ? 0 : GRASS_ALIGN_STRENGTH,
+        baseScale: GRASS_BASE_SCALE,
         randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : GRASS_SCALE_RANGE,
+        alphaTest: SCATTER_ALPHA_TEST,
         // If you vertex-paint Ground_ForestClearing in Blender (white =
         // grass allowed, black = keep clear, e.g. paint the walking
         // path black), this automatically keeps grass off the path —
@@ -3338,7 +3358,9 @@
         surface: boundary, template: treeTemplate,
         count: SCATTER_PREVIEW_MODE ? 8 : TREE_COUNT,
         alignToNormal: false,
-        randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : TREE_SCALE_RANGE
+        baseScale: TREE_BASE_SCALE,
+        randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : TREE_SCALE_RANGE,
+        alphaTest: SCATTER_ALPHA_TEST
       });
       if (endingTreeMesh){
         scene.add(endingTreeMesh);
@@ -3830,23 +3852,27 @@
       player.z = Math.max(ROOM_BOUNDS.minZ, Math.min(ROOM_BOUNDS.maxZ, player.z));
     }
 
-    // Follow the ground height at the player's new XZ position (the flat
-    // room floor makes this a no-op there; on a bumpy/hilly ending
-    // terrain, this is what actually lets the player walk up the hill
-    // instead of staying pinned at spawn height).
-    var groundY = sampleGroundHeight(player.x, player.z, player.y);
-    if (groundY != null){
-      var targetY = groundY + eyeHeightOffset;
-      var desiredDelta = (targetY - player.y) * Math.min(1, dt * 10);
-      // Hard safety cap — independent of the tolerance heuristic above —
-      // so the camera can physically never snap upward (or downward) by
-      // more than ~6 units/sec no matter what a single frame's raycast
-      // happens to hit. A real, deliberate climb (like the forest hill)
-      // still feels smooth well under this cap; a bad sample can only
-      // ever nudge the camera gradually, never instantly to the sky.
-      var maxStep = 6 * dt;
-      desiredDelta = Math.max(-maxStep, Math.min(maxStep, desiredDelta));
-      player.y += desiredDelta;
+    // Follow the ground height at the player's new XZ position — only in
+    // the ending scenes (isEndingMode), where the terrain is genuinely
+    // bumpy/hilly. The room's floor is flat, so this was always a no-op
+    // there in practice, but disabling it outright removes any chance of
+    // the raycast-based follow ever doing something unwanted on a flat,
+    // furnished floor (e.g. near tall furniture) where it isn't needed.
+    if (isEndingMode){
+      var groundY = sampleGroundHeight(player.x, player.z, player.y);
+      if (groundY != null){
+        var targetY = groundY + eyeHeightOffset;
+        var desiredDelta = (targetY - player.y) * Math.min(1, dt * 10);
+        // Hard safety cap — independent of the tolerance heuristic above —
+        // so the camera can physically never snap upward (or downward) by
+        // more than ~6 units/sec no matter what a single frame's raycast
+        // happens to hit. A real, deliberate climb (like the forest hill)
+        // still feels smooth well under this cap; a bad sample can only
+        // ever nudge the camera gradually, never instantly to the sky.
+        var maxStep = 6 * dt;
+        desiredDelta = Math.max(-maxStep, Math.min(maxStep, desiredDelta));
+        player.y += desiredDelta;
+      }
     }
 
     camera.position.set(player.x, player.y, player.z);
@@ -4776,6 +4802,8 @@
     // "following the ground", which looks far more natural.
     var alignStrength = opts.alignStrength != null ? opts.alignStrength : 0.4;
     var scaleRange = opts.randomScale || [1, 1];
+    var baseScale = opts.baseScale != null ? opts.baseScale : 1;
+    var alphaTest = opts.alphaTest != null ? opts.alphaTest : 0.5;
 
     var sampler = new THREE.MeshSurfaceSampler(surface);
     if (opts.weightAttribute){
@@ -4796,7 +4824,7 @@
     // expensive than a hard cutout discard.
     var instancedMaterial = template.material.clone();
     instancedMaterial.transparent = false;
-    instancedMaterial.alphaTest = 0.5;
+    instancedMaterial.alphaTest = alphaTest;
     instancedMaterial.depthWrite = true;
     instancedMaterial.side = THREE.DoubleSide; // cross-cards need to be visible from both sides
 
@@ -4831,7 +4859,7 @@
       spinQuat.setFromAxisAngle(up, Math.random() * Math.PI * 2);
       finalQuat.copy(alignQuat).multiply(spinQuat);
 
-      var s = scaleRange[0] + Math.random() * (scaleRange[1] - scaleRange[0]);
+      var s = baseScale * (scaleRange[0] + Math.random() * (scaleRange[1] - scaleRange[0]));
       scaleVec.set(s, s, s);
 
       matrix.compose(position, finalQuat, scaleVec);
