@@ -2373,6 +2373,20 @@
   var ENDING_KEEP_THRESHOLD = 0.55;
   var ENDING_DISCARD_THRESHOLD = 0.45;
 
+  // Default scatter settings — used by any ending whose ENDING_CONFIG
+  // entry doesn't override its own `scatter` block below.
+  var SCATTER_DEFAULTS = {
+    grassCount: 2500, grassBaseScale: 1, grassScaleRange: [0.85, 1.2], grassAlignStrength: 0,
+    treeCount: 200, treeBaseScale: 1, treeScaleRange: [0.9, 1.3],
+    alphaTest: 0.5
+  };
+  // Flip this to true to preview true template size/orientation: forces
+  // a handful of instances with NO random scale variance and no
+  // rotation, so what you see is exactly the template's real size — the
+  // fastest way to dial in size without guessing. Applies to whichever
+  // scene you're currently testing.
+  var SCATTER_PREVIEW_MODE = false;
+
   var ENDING_CONFIG = {
     forest: {
       label: '森林鞦韆', theme: 'ending-forest',
@@ -2381,7 +2395,15 @@
       letterContent: '（這裡放森林鞦韆結局的信件內容——之後在 ENDING_CONFIG.forest.letterContent 這裡直接改文字就好，不用動其他程式碼。）',
       groundName: 'Ground_ForestClearing',
       grassBoundaryName: null, // null = sample grass across the whole ground (this is what forest-swing.glb already uses)
-      treeBoundaryName: 'PathBoundary'
+      treeBoundaryName: 'PathBoundary',
+      // Independent from every other ending — tune freely without
+      // affecting lake/stream. Grass was covering the path entirely at
+      // scale 2, so this starts smaller than the old shared global did.
+      scatter: {
+        grassCount: 2500, grassBaseScale: 0.6, grassScaleRange: [0.85, 1.2], grassAlignStrength: 0,
+        treeCount: 200, treeBaseScale: 1, treeScaleRange: [0.9, 1.3],
+        alphaTest: 0.5
+      }
     },
     lake: {
       label: '湖邊椅子', theme: 'ending-lake',
@@ -2390,7 +2412,8 @@
       letterContent: '（湖邊椅子結局如果之後也想放信件，內容寫在這裡。）',
       groundName: 'Ground_LakeChair',
       grassBoundaryName: null,
-      treeBoundaryName: 'PathBoundary'
+      treeBoundaryName: 'PathBoundary',
+      scatter: null // not built yet — falls back to SCATTER_DEFAULTS
     },
     stream: {
       label: '小溪涼椅', theme: 'ending-stream',
@@ -2400,7 +2423,14 @@
       groundName: 'Ground_StreamBench',
       grassBoundaryName: 'GrassBoundary', // separate from the tree boundary, per this scene's design
       treeBoundaryName: 'TreeBoundary',
-      hdriPath: './assets/hdri/mountain-1k.exr' // this ending uses its own sky instead of the default
+      hdriPath: './assets/hdri/mountain-1k.exr', // this ending uses its own sky instead of the default
+      // Already looked right at the old shared defaults, so this just
+      // pins down those same numbers independently for this scene.
+      scatter: {
+        grassCount: 2500, grassBaseScale: 2, grassScaleRange: [0.85, 1.2], grassAlignStrength: 0,
+        treeCount: 200, treeBaseScale: 1, treeScaleRange: [0.9, 1.3],
+        alphaTest: 0.5
+      }
     }
   };
 
@@ -2525,6 +2555,20 @@
       .catch(function(err){ console.warn('loadItemsFromSheet failed', err); });
   }
   loadItemsFromSheet(); // kick off early so it's ready well before anyone opens a swipe deck
+
+  // ---------------- Letters (結局信件內容，來自 Letters 分頁) ----------------
+  var sheetLettersCache = null; // null = not loaded yet; once loaded, {endingId: content}
+
+  function loadLetters(){
+    if (!GOOGLE_SHEET_API_URL || sheetLettersCache) return;
+    fetch(sheetApiUrl({ action: 'getLetters' }))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (data && data.ok && data.letters) sheetLettersCache = data.letters;
+      })
+      .catch(function(err){ console.warn('loadLetters failed', err); });
+  }
+  loadLetters(); // kick off early so it's ready well before anyone reaches an ending
 
   /* ---------------- Guinea pig wander ---------------- */
   var wrap = document.getElementById('guineaWrap');
@@ -3298,42 +3342,17 @@
       size.x.toFixed(2), size.y.toFixed(2), size.z.toFixed(2));
   }
 
-  // Scatters grass across Ground_ForestClearing and trees along
-  // PathBoundary using scatterInstancesOnSurface (see its definition
-  // further down) — both are optional per ending; anything not found
-  // is skipped (with a console warning explaining why) so this works
-  // for lake/stream endings that don't have grass/tree templates at all.
-  // ---- Tunable scatter settings — adjust these directly while testing ----
-  var GRASS_COUNT = 2500;           // start lower than 4000 while checking performance; raise once smooth
-  // Your GrassCard_Template is coming in far too large (screenshot shows
-  // grass nearly as tall as the background trees). Instead of a slow
-  // Blender → re-export → re-upload loop for every size guess, tune this
-  // multiplier here first — it's applied on TOP of GRASS_SCALE_RANGE
-  // below, so 0.15 means "shrink the template to ~15% of its exported
-  // size". Once you land on a number that looks right, you can optionally
-  // bake that same shrink into the actual Blender object later — but you
-  // don't have to; this is a fully working permanent fix on its own.
-  var GRASS_BASE_SCALE = 2;
-  var GRASS_SCALE_RANGE = [0.85, 1.2];  // random variance multiplied on top of GRASS_BASE_SCALE
-  var GRASS_ALIGN_STRENGTH = 0;     // 0=upright, 1=fully follows terrain tilt — 0 keeps growth direction uniform (no chaotic per-instance tilt)
-  var TREE_COUNT = 200;
-  var TREE_BASE_SCALE = 1.0;        // same idea as GRASS_BASE_SCALE, in case TreeCard_Template needs it too
-  var TREE_SCALE_RANGE = [0.9, 1.3];
-  // 0.5 is a hard black/white cutoff — if your grass texture's alpha
-  // channel has soft/gradient edges rather than a crisp silhouette, that
-  // cutoff can leave jagged, spiky-looking edges (this is very likely
-  // what's causing the ragged edges in your screenshot). Try nudging
-  // this down (e.g. 0.3) if edges look torn, or up (e.g. 0.7) if you see
-  // a faint transparent halo instead.
-  var SCATTER_ALPHA_TEST = 0.5;
-  // Flip this to true to preview true template size/orientation: forces
-  // a handful of instances with NO random scale variance (scale locked
-  // to GRASS_BASE_SCALE/TREE_BASE_SCALE exactly) and no rotation, so
-  // what you see is exactly the template's real size — the fastest way
-  // to dial in size without guessing.
-  var SCATTER_PREVIEW_MODE = false;
-
+  // Scatters grass across the ground and trees along the boundary using
+  // scatterInstancesOnSurface (see its definition further down) — both
+  // are optional per ending; anything not found is skipped (with a
+  // console warning explaining why) so this works for lake/stream
+  // endings that don't have grass/tree templates at all. Every number
+  // below comes from THIS ending's own cfg.scatter block (falling back
+  // to SCATTER_DEFAULTS if it doesn't define one) — completely
+  // independent from every other ending, so tuning forest's grass size
+  // can never again affect stream's.
   function wireEndingScatter(gltf, cfg){
+    var s = cfg.scatter || SCATTER_DEFAULTS;
     var groundName = cfg.groundName || 'Ground_ForestClearing';
     var ground = resolveSingleMesh(groundName, gltf);
     var grassTemplate = resolveSingleMesh('GrassCard_Template', gltf);
@@ -3357,12 +3376,12 @@
       grassTemplate.visible = false; // only the scattered instances should render
       endingGrassMesh = scatterInstancesOnSurface({
         surface: grassSurface, template: grassTemplate,
-        count: SCATTER_PREVIEW_MODE ? 12 : GRASS_COUNT,
+        count: SCATTER_PREVIEW_MODE ? 12 : s.grassCount,
         alignToNormal: true,
-        alignStrength: SCATTER_PREVIEW_MODE ? 0 : GRASS_ALIGN_STRENGTH,
-        baseScale: GRASS_BASE_SCALE,
-        randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : GRASS_SCALE_RANGE,
-        alphaTest: SCATTER_ALPHA_TEST,
+        alignStrength: SCATTER_PREVIEW_MODE ? 0 : s.grassAlignStrength,
+        baseScale: s.grassBaseScale,
+        randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : s.grassScaleRange,
+        alphaTest: s.alphaTest,
         // If you vertex-paint the grass surface in Blender (white =
         // grass allowed, black = keep clear), this automatically keeps
         // grass off any painted-black area — harmless no-op if you
@@ -3387,11 +3406,11 @@
       boundary.visible = false; // sampling guide only, never meant to be seen
       endingTreeMesh = scatterInstancesOnSurface({
         surface: boundary, template: treeTemplate,
-        count: SCATTER_PREVIEW_MODE ? 8 : TREE_COUNT,
+        count: SCATTER_PREVIEW_MODE ? 8 : s.treeCount,
         alignToNormal: false,
-        baseScale: TREE_BASE_SCALE,
-        randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : TREE_SCALE_RANGE,
-        alphaTest: SCATTER_ALPHA_TEST
+        baseScale: s.treeBaseScale,
+        randomScale: SCATTER_PREVIEW_MODE ? [1, 1] : s.treeScaleRange,
+        alphaTest: s.alphaTest
       });
       if (endingTreeMesh){
         scene.add(endingTreeMesh);
@@ -4958,7 +4977,12 @@
 
   function openLetterModal(){
     var cfg = ENDING_CONFIG[currentEndingId];
-    letterModalBody.textContent = (cfg && cfg.letterContent) || '（這封信還沒有內容。）';
+    var name = visitorDisplayName || '你';
+    var header = name + '，你這次留下了 ' + sessionKeepCount + ' 件、丟掉了 ' + sessionDiscardCount + ' 件。';
+    var customContent = (sheetLettersCache && sheetLettersCache[currentEndingId])
+      || (cfg && cfg.letterContent)
+      || '（這封信還沒有內容。）';
+    letterModalBody.textContent = header + '\n\n' + customContent;
     letterModalOverlay.classList.add('active');
     controlsPaused = true;
   }
