@@ -2387,6 +2387,17 @@
   // scene you're currently testing.
   var SCATTER_PREVIEW_MODE = false;
 
+  // Per-scene look. 'day' = the original room/forest/stream look; 'night'
+  // turns off the default daylight rig (so the Blender moon/point lights
+  // in the .glb are what light the scene), swaps fog to deep blue and
+  // lowers exposure. `glbLightScale` multiplies every light imported
+  // from the .glb — Blender's Watts rarely map 1:1 to three.js, so if the
+  // moon/point lights look too dark or blown out, tune ONLY this number.
+  var ATMOSPHERES = {
+    day:   { fogColor: 0xbfe0e8, fogNear: 18, fogFar: 34, exposure: 0.95, hemi: 0.3, sun: 0.35, glbLightScale: 1 },
+    night: { fogColor: 0x070d1f, fogNear: 10, fogFar: 40, exposure: 1.1,  hemi: 0.08, sun: 0,    glbLightScale: 0.02 }
+  };
+
   var ENDING_CONFIG = {
     forest: {
       label: '森林鞦韆', theme: 'ending-forest',
@@ -2410,10 +2421,14 @@
       flavor: '放下之後，才看得見湖面真正的樣子。',
       modelPath: './assets/models/endings/lake-chair.glb',
       letterContent: '（湖邊椅子結局如果之後也想放信件，內容寫在這裡。）',
-      groundName: 'Ground_LakeChair',
+      groundName: 'Deck_Lake',        // 甲板（不再有草地/樹，只是讓 console 能印出尺寸）
       grassBoundaryName: null,
-      treeBoundaryName: 'PathBoundary',
-      scatter: null // not built yet — falls back to SCATTER_DEFAULTS
+      treeBoundaryName: null,
+      hdriPath: './assets/hdri/night-stars-1k.exr', // 夜晚星空
+      scatter: false,                 // false = 這個場景完全不生成草/樹
+      waterName: 'Water_Lake',        // 湖面物件名稱
+      waterFlow: false,               // 湖面靜止；想要微微流動改成 true
+      atmosphere: 'night'             // 夜晚：關掉預設日光、改深藍霧、降低曝光
     },
     stream: {
       label: '小溪涼椅', theme: 'ending-stream',
@@ -3050,10 +3065,12 @@
     // on top of each other — AO + full realtime rig + HDRI — which is
     // what was blowing the room out. This rig is now just a subtle key
     // light for a bit of directional definition, not the main light.
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x6b5240, 0.3));
+    defaultHemiLight = new THREE.HemisphereLight(0xffffff, 0x6b5240, 0.3);
+    scene.add(defaultHemiLight);
     var sun = new THREE.DirectionalLight(0xfff2da, 0.35);
     sun.position.set(6, 10, 4);
     scene.add(sun);
+    defaultSunLight = sun;
 
     loadHdriEnvironment();
 
@@ -3126,6 +3143,32 @@
   //     the real sky, visible through windows/the open doorway.
   // Silently keeps the flat color as-is if the file isn't there yet or
   // EXRLoader didn't load — never blocks the room from working.
+  var defaultHemiLight = null, defaultSunLight = null;
+
+  // Switches global lighting/fog/exposure between ATMOSPHERES presets.
+  // Called at the start of every scene load so a night ending can never
+  // leak into the room (or the other way around).
+  function applyAtmosphere(name){
+    var a = ATMOSPHERES[name] || ATMOSPHERES.day;
+    renderer.toneMappingExposure = a.exposure;
+    scene.fog = new THREE.Fog(a.fogColor, a.fogNear, a.fogFar);
+    scene.background = new THREE.Color(a.fogColor); // placeholder until the HDRI finishes loading
+    scene.environment = null; // drop the previous scene's sky lighting until the new HDRI loads
+    if (defaultHemiLight) defaultHemiLight.intensity = a.hemi;
+    if (defaultSunLight) defaultSunLight.intensity = a.sun;
+    return a;
+  }
+
+  // Scales every light that came from the .glb (KHR_lights_punctual).
+  function scaleGlbLights(root, scale){
+    if (scale === 1) return;
+    var n = 0;
+    root.traverse(function(o){
+      if (o.isLight){ o.intensity *= scale; n++; }
+    });
+    if (n) console.log('[燈光] .glb 內的 ' + n + ' 盞燈已套用強度倍率 ' + scale);
+  }
+
   function loadHdriEnvironment(path){
     path = path || HDRI_PATH;
     if (typeof THREE.EXRLoader !== 'function'){
@@ -3173,6 +3216,7 @@
     letterInteractiveMesh = null;
     exitPortalMesh = null;
     hovered = null;
+    applyAtmosphere('day');
 
     var loader = new THREE.GLTFLoader();
     loader.load(
@@ -3241,6 +3285,7 @@
     letterInteractiveMesh = null;
     exitPortalMesh = null;
     hovered = null;
+    var atmo = applyAtmosphere(cfg.atmosphere || 'day');
 
     var loader = new THREE.GLTFLoader();
     loader.load(
@@ -3255,12 +3300,13 @@
         scene.add(gltf.scene);
         collidableRoot = gltf.scene;
         currentSceneKey = currentEndingId;
+        scaleGlbLights(gltf.scene, atmo.glbLightScale);
         wireDefaultCamera(gltf);
         computeEyeHeightOffset();
         wireModelAnimations(gltf);
         wireEndingLetter(gltf);
         wireEndingScatter(gltf, cfg);
-        wireEndingWater(gltf);
+        wireEndingWater(gltf, cfg);
         loadHdriEnvironment(cfg.hdriPath); // falls back to the default sky if this ending doesn't specify its own
         computeRoomBounds(gltf.scene);
         showRoomLoading(false);
@@ -3352,6 +3398,7 @@
   // independent from every other ending, so tuning forest's grass size
   // can never again affect stream's.
   function wireEndingScatter(gltf, cfg){
+    if (cfg.scatter === false) return; // this ending has no grass/trees at all (e.g. lake)
     var s = cfg.scatter || SCATTER_DEFAULTS;
     var groundName = cfg.groundName || 'Ground_ForestClearing';
     var ground = resolveSingleMesh(groundName, gltf);
@@ -3428,20 +3475,27 @@
   // standard cheap trick for rivers/streams in real-time 3D — a texture
   // with flow-line/ripple art scrolling in the flow direction reads as
   // moving water despite the mesh itself being completely static.
-  function wireEndingWater(gltf){
-    endingWaterMesh = gltf.scene.getObjectByName('Water_Stream') || null;
+  function wireEndingWater(gltf, cfg){
+    cfg = cfg || {};
+    var waterName = cfg.waterName || 'Water_Stream';
+    if (cfg.waterFlow === false){ // water exists but should stay still (e.g. a calm lake)
+      endingWaterMesh = null;
+      console.log('[結局場景] "' + waterName + '" 設定為靜止，不啟用流動效果');
+      return;
+    }
+    endingWaterMesh = gltf.scene.getObjectByName(waterName) || null;
     if (!endingWaterMesh){
-      console.log('[結局場景] 沒有找到 "Water_Stream"（這個結局如果沒有流水效果，這是正常的）');
+      console.log('[結局場景] 沒有找到 "' + waterName + '"（這個結局如果沒有流水效果，這是正常的）');
       return;
     }
     var map = endingWaterMesh.material && endingWaterMesh.material.map;
     if (!map){
-      console.warn('[結局場景] "Water_Stream" 找到了，但材質沒有貼圖可以拿來做流動效果');
+      console.warn('[結局場景] "' + waterName + '" 找到了，但材質沒有貼圖可以拿來做流動效果');
       return;
     }
     map.wrapS = THREE.RepeatWrapping;
     map.wrapT = THREE.RepeatWrapping;
-    console.log('[結局場景] "Water_Stream" 找到了 ✓，流水效果已啟用');
+    console.log('[結局場景] "' + waterName + '" 找到了 ✓，流水效果已啟用');
   }
 
   function updateEndingWaterFlow(dt){
