@@ -2306,13 +2306,31 @@
     }
     syncIcon();
 
+    // Clicking the icon now mutes / unmutes the whole soundtrack (in every
+    // scene, endings included — the mute flag lives in AudioManager).
+    // The volume slider is still reachable: on a mouse it slides open
+    // while hovering the icon; on touch screens a long-press opens it.
+    var panel = btn.parentNode;
+    var longPressTimer = null, longPressFired = false;
+
     btn.addEventListener('click', function(e){
       e.stopPropagation();
-      wrap.classList.toggle('expanded');
-      if (!wrap.classList.contains('expanded')) return;
-      // toggling mute from the icon itself only when the panel was
-      // already open — first click just reveals the slider
-      slider.focus();
+      if (longPressFired){ longPressFired = false; return; } // the long-press already opened the slider
+      AudioManager.toggleMute();
+      syncIcon();
+    });
+    panel.addEventListener('mouseenter', function(){ wrap.classList.add('expanded'); });
+    panel.addEventListener('mouseleave', function(){ wrap.classList.remove('expanded'); });
+    btn.addEventListener('pointerdown', function(e){
+      if (e.pointerType === 'mouse') return;
+      longPressFired = false;
+      longPressTimer = setTimeout(function(){
+        longPressFired = true;
+        wrap.classList.toggle('expanded');
+      }, 500);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function(ev){
+      btn.addEventListener(ev, function(){ clearTimeout(longPressTimer); });
     });
     slider.addEventListener('input', function(){
       AudioManager.setVolume(slider.value / 100);
@@ -2434,6 +2452,8 @@
       scatter: false,                 // false = 這個場景完全不生成草/樹
       waterName: 'Water_Lake',        // 湖面物件名稱
       waterFlow: false,               // 湖面靜止；想要微微流動改成 true
+      walkOnlyOn: 'Deck_Lake',        // 只能走在這個物件上方：腳下沒有它就走不過去（防止離開甲板）
+      lockHeight: true,               // 這個場景鎖定視線高度，走路不會因為甲板木板凹凸而上下晃動
       atmosphere: 'night'             // 夜晚：關掉預設日光、改深藍霧、降低曝光
     },
     stream: {
@@ -3325,6 +3345,7 @@
     exitPortalMesh = null;
     hovered = null;
     removeLightTuner();
+    walkSurface = null; lockPlayerHeight = false;
     applyAtmosphere('day');
 
     var loader = new THREE.GLTFLoader();
@@ -3395,6 +3416,7 @@
     exitPortalMesh = null;
     hovered = null;
     removeLightTuner();
+    walkSurface = null; lockPlayerHeight = false;
     var atmo = applyAtmosphere(cfg.atmosphere || 'day');
 
     var loader = new THREE.GLTFLoader();
@@ -3412,6 +3434,12 @@
         currentSceneKey = currentEndingId;
         applyGlbLighting(gltf.scene, atmo);
         buildLightTuner(atmo);
+        lockPlayerHeight = !!cfg.lockHeight;
+        if (cfg.walkOnlyOn){
+          walkSurface = gltf.scene.getObjectByName(cfg.walkOnlyOn) || null;
+          if (walkSurface) console.log('[結局場景] 行走範圍限制在 "' + cfg.walkOnlyOn + '" ✓');
+          else console.warn('[結局場景] 找不到 "' + cfg.walkOnlyOn + '"，行走範圍沒有被限制 — 請確認 Blender 內甲板的物件名稱');
+        }
         wireDefaultCamera(gltf);
         computeEyeHeightOffset();
         wireModelAnimations(gltf);
@@ -4043,6 +4071,30 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
+  // Per-scene movement rules, set by loadEndingModel from ENDING_CONFIG and
+  // cleared by both loaders so they can never leak into another scene.
+  var walkSurface = null;        // Object3D the player must stay above (null = no restriction)
+  var lockPlayerHeight = false;  // true = never change eye height (no terrain-follow bobbing)
+  var walkRaycaster = new THREE.Raycaster();
+  var WALK_EDGE_MARGIN = 0.35;   // how far from the deck's edge the player stops (world units)
+  var WALK_PROBES = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
+  var walkDown = new THREE.Vector3(0, -1, 0);
+
+  function isOnWalkSurface(x, z){
+    if (!walkSurface) return true;
+    // Five downward probes (center + four sides at the edge margin) so the
+    // player's body, not just their exact center, has to stay on the deck.
+    for (var i = 0; i < WALK_PROBES.length; i++){
+      walkRaycaster.set(
+        new THREE.Vector3(x + WALK_PROBES[i][0] * WALK_EDGE_MARGIN, player.y, z + WALK_PROBES[i][1] * WALK_EDGE_MARGIN),
+        walkDown
+      );
+      walkRaycaster.far = eyeHeightOffset + 2;
+      if (!walkRaycaster.intersectObject(walkSurface, true).length) return false;
+    }
+    return true;
+  }
+
   function updateMovement(dt){
     if (controlsPaused || isCameraTransitioning) return;
 
@@ -4093,8 +4145,19 @@
       }
 
       var move = dir.multiplyScalar(allowedDist);
-      player.x += move.x;
-      player.z += move.z;
+      var nx = player.x + move.x, nz = player.z + move.z;
+      // Walk-surface restriction (ENDING_CONFIG.walkOnlyOn): a step is only
+      // allowed if the ground right under the new spot is that object.
+      // Tries sliding along the edge (X only, then Z only) before giving up.
+      // If the player isn't on the surface to begin with (spawn point
+      // hovering off the deck), the restriction is skipped so nobody gets stuck.
+      if (walkSurface && isOnWalkSurface(player.x, player.z) && !isOnWalkSurface(nx, nz)){
+        if (isOnWalkSurface(nx, player.z)) nz = player.z;
+        else if (isOnWalkSurface(player.x, nz)) nx = player.x;
+        else { nx = player.x; nz = player.z; velocity.set(0, 0, 0); }
+      }
+      player.x = nx;
+      player.z = nz;
       player.x = Math.max(ROOM_BOUNDS.minX, Math.min(ROOM_BOUNDS.maxX, player.x));
       player.z = Math.max(ROOM_BOUNDS.minZ, Math.min(ROOM_BOUNDS.maxZ, player.z));
     }
@@ -4105,7 +4168,7 @@
     // there in practice, but disabling it outright removes any chance of
     // the raycast-based follow ever doing something unwanted on a flat,
     // furnished floor (e.g. near tall furniture) where it isn't needed.
-    if (isEndingMode){
+    if (isEndingMode && !lockPlayerHeight){
       var groundY = sampleGroundHeight(player.x, player.z, player.y);
       if (groundY != null){
         var targetY = groundY + eyeHeightOffset;
