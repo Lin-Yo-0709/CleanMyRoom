@@ -2395,7 +2395,13 @@
   // moon/point lights look too dark or blown out, tune ONLY this number.
   var ATMOSPHERES = {
     day:   { fogColor: 0xbfe0e8, fogNear: 18, fogFar: 34, exposure: 0.95, hemi: 0.3, sun: 0.35, glbLightScale: 1 },
-    night: { fogColor: 0x070d1f, fogNear: 10, fogFar: 40, exposure: 1.1,  hemi: 0.08, sun: 0,    glbLightScale: 0.02 }
+    // Night starting values are deliberately dim. Tune live with ?tune=1
+    // (see buildLightTuner), then paste the copied numbers over these.
+    // lightByType gives every .glb light of that kind an absolute intensity;
+    // lightByName ('moon', 'point' … matched inside the light's name) wins over it.
+    night: { fogColor: 0x070d1f, fogNear: 10, fogFar: 40, exposure: 0.8, hemi: 0.03, sun: 0,
+             envIntensity: 0.2, glbLightScale: 0.001,
+             lightByType: { DirectionalLight: 0.5, PointLight: 1.2, SpotLight: 1.2 }, lightByName: {} }
   };
 
   var ENDING_CONFIG = {
@@ -3159,14 +3165,116 @@
     return a;
   }
 
-  // Scales every light that came from the .glb (KHR_lights_punctual).
-  function scaleGlbLights(root, scale){
-    if (scale === 1) return;
-    var n = 0;
+  // Lights imported from the .glb (KHR_lights_punctual). Blender exports
+  // physical units (W / lux), but this renderer is NOT in physical-light
+  // mode, so raw numbers are typically 10-1000x too bright — that is the
+  // classic "looks fine in Blender, blown out on the web" problem. So
+  // instead of trusting the exported numbers, each light's FINAL
+  // intensity is decided here, in this priority order:
+  //   1) atmosphere.lightByName  — substring of the light's name (case-insensitive)
+  //   2) atmosphere.lightByType  — 'DirectionalLight' / 'PointLight' / 'SpotLight'
+  //   3) exported intensity * atmosphere.glbLightScale
+  // Also sets material.envMapIntensity when the atmosphere defines
+  // envIntensity (the night HDRI otherwise lights every surface evenly).
+  var glbLights = [];
+  function applyGlbLighting(root, a){
+    glbLights = [];
+    var rows = [];
     root.traverse(function(o){
-      if (o.isLight){ o.intensity *= scale; n++; }
+      if (!o.isLight) return;
+      var base = o.intensity;
+      var final = base * (a.glbLightScale == null ? 1 : a.glbLightScale);
+      var rule = 'scale';
+      var lname = (o.name || '').toLowerCase();
+      if (a.lightByType && a.lightByType[o.type] != null){ final = a.lightByType[o.type]; rule = 'type'; }
+      if (a.lightByName){
+        Object.keys(a.lightByName).forEach(function(k){
+          if (lname.indexOf(k.toLowerCase()) !== -1){ final = a.lightByName[k]; rule = 'name'; }
+        });
+      }
+      o.userData.baseIntensity = base;
+      o.intensity = final;
+      glbLights.push(o);
+      rows.push({ name: o.name || '(未命名)', type: o.type, 匯出原值: +base.toFixed(3), 最終強度: +final.toFixed(3), 規則: rule });
     });
-    if (n) console.log('[燈光] .glb 內的 ' + n + ' 盞燈已套用強度倍率 ' + scale);
+    if (a.envIntensity != null){
+      root.traverse(function(o){
+        if (!o.isMesh) return;
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach(function(m){
+          if (m && 'envMapIntensity' in m) m.envMapIntensity = a.envIntensity;
+        });
+      });
+    }
+    if (rows.length){ console.log('[燈光] .glb 內的燈：'); console.table(rows); }
+    else console.log('[燈光] .glb 內沒有任何燈（匯出時是否勾了 Punctual Lights？）');
+  }
+
+  // ---- Live tuning panel: add ?tune=1 to the URL (e.g. yoursite.com/?tune=1).
+  // Drag sliders while standing inside the scene, then press「複製設定」and
+  // paste the result into ATMOSPHERES.night. Never shown to normal visitors.
+  var lightTunerEl = null;
+  function removeLightTuner(){
+    if (lightTunerEl && lightTunerEl.parentNode) lightTunerEl.parentNode.removeChild(lightTunerEl);
+    lightTunerEl = null;
+  }
+  function buildLightTuner(a){
+    removeLightTuner();
+    if (!/[?&]tune=1/.test(location.search)) return;
+    var box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:99999;background:rgba(10,14,30,.88);color:#fff;font:12px/1.4 sans-serif;padding:10px 12px;border-radius:10px;width:230px;max-height:60vh;overflow:auto';
+    ['pointerdown','mousedown','mouseup','keydown','keyup','wheel','touchstart'].forEach(function(ev){
+      box.addEventListener(ev, function(e){ e.stopPropagation(); });
+    });
+    var title = document.createElement('div');
+    title.textContent = '燈光調整（?tune=1）';
+    title.style.cssText = 'font-weight:bold;margin-bottom:6px';
+    box.appendChild(title);
+
+    function addSlider(label, min, max, step, value, onChange){
+      var wrap = document.createElement('div');
+      wrap.style.marginBottom = '6px';
+      var t = document.createElement('div');
+      var inp = document.createElement('input');
+      inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = value;
+      inp.style.width = '100%';
+      function show(){ t.textContent = label + '：' + (+inp.value).toFixed(2); }
+      inp.addEventListener('input', function(){ onChange(+inp.value); show(); });
+      show();
+      wrap.appendChild(t); wrap.appendChild(inp); box.appendChild(wrap);
+    }
+
+    addSlider('整體曝光', 0.1, 2, 0.01, renderer.toneMappingExposure, function(v){ renderer.toneMappingExposure = v; a.exposure = v; });
+    if (a.envIntensity != null){
+      addSlider('環境(HDRI)打亮材質', 0, 1.5, 0.01, a.envIntensity, function(v){
+        a.envIntensity = v;
+        if (collidableRoot) collidableRoot.traverse(function(o){
+          if (!o.isMesh) return;
+          (Array.isArray(o.material) ? o.material : [o.material]).forEach(function(m){ if (m && 'envMapIntensity' in m) m.envMapIntensity = v; });
+        });
+      });
+    }
+    addSlider('預設環境光', 0, 1, 0.01, a.hemi, function(v){ a.hemi = v; if (defaultHemiLight) defaultHemiLight.intensity = v; });
+    glbLights.forEach(function(l){
+      var max = Math.max(5, l.intensity * 3);
+      addSlider((l.name || l.type), 0, max, 0.01, l.intensity, function(v){ l.intensity = v; });
+    });
+
+    var btn = document.createElement('button');
+    btn.textContent = '複製設定';
+    btn.style.cssText = 'width:100%;margin-top:4px;padding:4px;cursor:pointer';
+    btn.addEventListener('click', function(){
+      var byName = {};
+      glbLights.forEach(function(l){ byName[l.name || l.type] = +l.intensity.toFixed(3); });
+      var out = 'exposure: ' + (+renderer.toneMappingExposure.toFixed(3)) + ', hemi: ' + (+a.hemi.toFixed(3)) +
+        (a.envIntensity != null ? ', envIntensity: ' + (+a.envIntensity.toFixed(3)) : '') +
+        ', lightByName: ' + JSON.stringify(byName);
+      console.log('[燈光設定] 貼進 ATMOSPHERES.night：\n' + out);
+      try { navigator.clipboard.writeText(out); btn.textContent = '已複製 ✓（也印在 F12）'; }
+      catch (e) { btn.textContent = '請從 F12 複製'; }
+    });
+    box.appendChild(btn);
+    document.body.appendChild(box);
+    lightTunerEl = box;
   }
 
   function loadHdriEnvironment(path){
@@ -3216,6 +3324,7 @@
     letterInteractiveMesh = null;
     exitPortalMesh = null;
     hovered = null;
+    removeLightTuner();
     applyAtmosphere('day');
 
     var loader = new THREE.GLTFLoader();
@@ -3285,6 +3394,7 @@
     letterInteractiveMesh = null;
     exitPortalMesh = null;
     hovered = null;
+    removeLightTuner();
     var atmo = applyAtmosphere(cfg.atmosphere || 'day');
 
     var loader = new THREE.GLTFLoader();
@@ -3300,7 +3410,8 @@
         scene.add(gltf.scene);
         collidableRoot = gltf.scene;
         currentSceneKey = currentEndingId;
-        scaleGlbLights(gltf.scene, atmo.glbLightScale);
+        applyGlbLighting(gltf.scene, atmo);
+        buildLightTuner(atmo);
         wireDefaultCamera(gltf);
         computeEyeHeightOffset();
         wireModelAnimations(gltf);
