@@ -2452,6 +2452,7 @@
       scatter: false,                 // false = 這個場景完全不生成草/樹
       waterName: 'Water_Lake',        // 湖面物件名稱
       waterFlow: false,               // 湖面靜止；想要微微流動改成 true
+      walkEdgeMargin: 0.1,            // 離甲板邊緣多近會被擋住：越小越能走到邊邊、越不容易卡住；0 = 只檢查腳下正中心
       walkOnlyOn: 'Deck_Lake',        // 只能走在這個物件上方：腳下沒有它就走不過去（防止離開甲板）
       lockHeight: true,               // 這個場景鎖定視線高度，走路不會因為甲板木板凹凸而上下晃動
       atmosphere: 'night'             // 夜晚：關掉預設日光、改深藍霧、降低曝光
@@ -3435,6 +3436,7 @@
         applyGlbLighting(gltf.scene, atmo);
         buildLightTuner(atmo);
         lockPlayerHeight = !!cfg.lockHeight;
+        WALK_EDGE_MARGIN = (cfg.walkEdgeMargin != null) ? cfg.walkEdgeMargin : 0.1;
         if (cfg.walkOnlyOn){
           walkSurface = gltf.scene.getObjectByName(cfg.walkOnlyOn) || null;
           if (walkSurface) console.log('[結局場景] 行走範圍限制在 "' + cfg.walkOnlyOn + '" ✓');
@@ -4076,7 +4078,7 @@
   var walkSurface = null;        // Object3D the player must stay above (null = no restriction)
   var lockPlayerHeight = false;  // true = never change eye height (no terrain-follow bobbing)
   var walkRaycaster = new THREE.Raycaster();
-  var WALK_EDGE_MARGIN = 0.35;   // how far from the deck's edge the player stops (world units)
+  var WALK_EDGE_MARGIN = 0.1;    // how far from the deck's edge the player stops (world units); per-scene override: ENDING_CONFIG.walkEdgeMargin
   var WALK_PROBES = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
   var walkDown = new THREE.Vector3(0, -1, 0);
 
