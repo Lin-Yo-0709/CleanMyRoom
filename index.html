@@ -2452,7 +2452,7 @@
       scatter: false,                 // false = 這個場景完全不生成草/樹
       waterName: 'Water_Lake',        // 湖面物件名稱
       waterFlow: false,               // 湖面靜止；想要微微流動改成 true
-      walkEdgeMargin: 0.1,            // 離甲板邊緣多近會被擋住：越小越能走到邊邊、越不容易卡住；0 = 只檢查腳下正中心
+      walkTolerance: 0.25,            // 甲板邊緣判定的寬容值：越大越好走（越能容忍起伏、縫隙），但越可能走出邊緣一點點；0.1~0.5 之間調
       walkOnlyOn: 'Deck_Lake',        // 只能走在這個物件上方：腳下沒有它就走不過去（防止離開甲板）
       lockHeight: true,               // 這個場景鎖定視線高度，走路不會因為甲板木板凹凸而上下晃動
       atmosphere: 'night'             // 夜晚：關掉預設日光、改深藍霧、降低曝光
@@ -3436,7 +3436,7 @@
         applyGlbLighting(gltf.scene, atmo);
         buildLightTuner(atmo);
         lockPlayerHeight = !!cfg.lockHeight;
-        WALK_EDGE_MARGIN = (cfg.walkEdgeMargin != null) ? cfg.walkEdgeMargin : 0.1;
+        WALK_TOLERANCE = (cfg.walkTolerance != null) ? cfg.walkTolerance : 0.25;
         if (cfg.walkOnlyOn){
           walkSurface = gltf.scene.getObjectByName(cfg.walkOnlyOn) || null;
           if (walkSurface) console.log('[結局場景] 行走範圍限制在 "' + cfg.walkOnlyOn + '" ✓');
@@ -4078,23 +4078,33 @@
   var walkSurface = null;        // Object3D the player must stay above (null = no restriction)
   var lockPlayerHeight = false;  // true = never change eye height (no terrain-follow bobbing)
   var walkRaycaster = new THREE.Raycaster();
-  var WALK_EDGE_MARGIN = 0.1;    // how far from the deck's edge the player stops (world units); per-scene override: ENDING_CONFIG.walkEdgeMargin
-  var WALK_PROBES = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
+  var WALK_TOLERANCE = 0.25;     // how forgiving the deck-edge test is (world units); per-scene override: ENDING_CONFIG.walkTolerance
+  var WALK_RING = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   var walkDown = new THREE.Vector3(0, -1, 0);
 
+  function walkProbe(x, z){
+    // Start well ABOVE the eyes and look far down, so a bump that rises
+    // above the camera height, or a dip in the deck, can't make the ray
+    // start under / miss the surface.
+    walkRaycaster.set(new THREE.Vector3(x, player.y + 3, z), walkDown);
+    walkRaycaster.far = eyeHeightOffset + 8;
+    return walkRaycaster.intersectObject(walkSurface, true).length > 0;
+  }
+
+  // Forgiving on purpose (bumpy decks have cracks / steep spots): a spot
+  // counts as "on the deck" if the point right under the player hits it,
+  // OR at least 2 of 4 points a short distance around it do. So a single
+  // missed ray on a bump never blocks movement; only really leaving the
+  // deck does.
   function isOnWalkSurface(x, z){
     if (!walkSurface) return true;
-    // Five downward probes (center + four sides at the edge margin) so the
-    // player's body, not just their exact center, has to stay on the deck.
-    for (var i = 0; i < WALK_PROBES.length; i++){
-      walkRaycaster.set(
-        new THREE.Vector3(x + WALK_PROBES[i][0] * WALK_EDGE_MARGIN, player.y, z + WALK_PROBES[i][1] * WALK_EDGE_MARGIN),
-        walkDown
-      );
-      walkRaycaster.far = eyeHeightOffset + 2;
-      if (!walkRaycaster.intersectObject(walkSurface, true).length) return false;
+    if (walkProbe(x, z)) return true;
+    var hits = 0;
+    for (var i = 0; i < WALK_RING.length; i++){
+      if (walkProbe(x + WALK_RING[i][0] * WALK_TOLERANCE, z + WALK_RING[i][1] * WALK_TOLERANCE)) hits++;
+      if (hits >= 2) return true;
     }
-    return true;
+    return false;
   }
 
   function updateMovement(dt){
